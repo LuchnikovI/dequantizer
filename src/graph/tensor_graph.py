@@ -1,7 +1,13 @@
 import sys
 from typing import (
-    Set, List, Tuple, Dict, Callable,
-    Iterator, Union, Optional,
+    Set,
+    List,
+    Tuple,
+    Dict,
+    Callable,
+    Iterator,
+    Union,
+    Optional,
 )
 from collections import deque
 from jax import Array
@@ -26,11 +32,13 @@ class TensorGraph:
         self.__edges_number: int = 0
 
     """Gets number of nodes in a tensor graph."""
+
     @property
     def nodes_number(self) -> int:
         return self.__nodes_number
 
     """Gets number of edges in a tensor graph."""
+
     @property
     def edges_number(self) -> int:
         return self.__edges_number
@@ -70,7 +78,9 @@ class TensorGraph:
                     new_edge._add_element(connected_node)
                     connected_node._add_element(new_edge)
                 else:
-                    raise KeyError(f"Node with ID {node_id} does not exists in the graph, but presents in the given edge ID {edge_id}")
+                    raise KeyError(
+                        f"Node with ID {node_id} does not exists in the graph, but presents in the given edge ID {edge_id}"
+                    )
             self.__edges[edge_id] = new_edge
         else:
             raise KeyError(f"Edge with ID {edge_id} already exists.")
@@ -171,9 +181,10 @@ class TensorGraph:
                     if expected_shape == tensor.shape:
                         tensors_dict[element.id] = tensor
                     else:
-                        raise ValueError(f"Expected tensor of shape {expected_shape} got tensor of shape {tensor.shape}.")
+                        raise ValueError(
+                            f"Expected tensor of shape {expected_shape} got tensor of shape {tensor.shape}."
+                        )
         return tensors_dict
-                        
 
     """Returns a dict with initialized messages that is used later in pure functions
     performing different algorithms, e.g. belief propagation.
@@ -193,7 +204,7 @@ class TensorGraph:
             return message_dict
         else:
             for element in elements_iterator:
-                if isinstance(element, Node):  
+                if isinstance(element, Node):
                     for edge in element.neighbors:
                         message = initializer((element, edge))
                         message_dict[(element.id, edge.id)] = message
@@ -213,7 +224,9 @@ class TensorGraph:
 
     def get_message_passing_map(
         self, traverser: Iterator[Union[Node, Edge]]
-    ) -> Callable[[Dict[NodeID, Array], Dict[MessageID, Array]], Dict[MessageID, Array]]:
+    ) -> Callable[
+        [Dict[NodeID, Array], Dict[MessageID, Array]], Dict[MessageID, Array]
+    ]:
         raise NotImplementedError()
 
     """Returns a function that computes a distance to the vidal gauge.
@@ -252,15 +265,18 @@ def get_random_tree_tensor_graph(
         disconnected_set_size = len(disconnected_nodes)
         connected_set_size = len(connected_nodes)
         key, subkey = split(key)
-        connected_id = connected_nodes[int(randint(subkey, (1,), 0, connected_set_size)[0])]
+        connected_id = connected_nodes[
+            int(randint(subkey, (1,), 0, connected_set_size)[0])
+        ]
         key, subkey = split(key)
-        disconnected_id = disconnected_nodes[int(randint(subkey, (1,), 0, disconnected_set_size)[0])]
+        disconnected_id = disconnected_nodes[
+            int(randint(subkey, (1,), 0, disconnected_set_size)[0])
+        ]
         random_tree.add_node(phys_dimension, disconnected_id)
         random_tree.add_edge((connected_id, disconnected_id), bond_dimension)
         disconnected_nodes.remove(disconnected_id)
         connected_nodes.append(disconnected_id)
     return random_tree
-        
 
 
 """Returns an N-dimensional lattice tensor graph whose nodes are labeled
@@ -295,7 +311,7 @@ def get_nd_lattice(
             next_j = j.copy()
             next_j[pos] += 1
             if lattice.does_node_exist(tuple(next_j)):
-                lattice.add_edge((tuple(j), tuple(next_j)), bond_dimension)       
+                lattice.add_edge((tuple(j), tuple(next_j)), bond_dimension)
     return lattice
 
 
@@ -350,54 +366,54 @@ def small_graph_test(empty_graph: TensorGraph, key: Array):
     # Number of nodes / edges correctness
     assert empty_graph.nodes_number == 5
     assert empty_graph.edges_number == 4
-    print('Nodes / edges number: OK', file=sys.stderr)
+    print("Nodes / edges number: OK", file=sys.stderr)
     # Node IDs correctness
     assert id0 == 0
     assert id1 == 1
     assert id2 == 2
     assert id3 == 3
     assert id4 == 4
-    print('Node IDs: OK', file=sys.stderr)
+    print("Node IDs: OK", file=sys.stderr)
     # Physical dimensions correctness
     assert n0.dimension == 2
     assert n1.dimension == 5
     assert n2.dimension == 3
     assert n3.dimension == 4
     assert n4.dimension == 6
-    print('Node dimensions: OK', file=sys.stderr)
+    print("Node dimensions: OK", file=sys.stderr)
     # Tensor ranks correctness
     assert n0.degree == 2
     assert n1.degree == 2
     assert n2.degree == 3
     assert n3.degree == 1
     assert n4.degree == 1
-    print('Node degrees: OK', file=sys.stderr)
+    print("Node degrees: OK", file=sys.stderr)
     # Tensor shape correctness
     assert n0.bond_shape == (2, 4)
     assert n1.bond_shape == (2, 5)
     assert n2.bond_shape == (4, 5, 6)
     assert n3.bond_shape == (6,)
     assert n4.bond_shape == (6,)
-    print('Bond shapes: OK', file=sys.stderr)
+    print("Bond shapes: OK", file=sys.stderr)
     # Neighboring edges correctness
     assert n0.neighbors == [e0, e1]
     assert n1.neighbors == [e0, e2]
     assert n2.neighbors == [e1, e2, e3]
     assert n3.neighbors == [e3]
     assert n4.neighbors == [e3]
-    print('Neighboring edges: OK', file=sys.stderr)
+    print("Neighboring edges: OK", file=sys.stderr)
     # Edge dimensions correctness
     assert e0.dimension == 2
     assert e1.dimension == 4
     assert e2.dimension == 5
     assert e3.dimension == 6
-    print('Edge dimensions: OK', file=sys.stderr)
+    print("Edge dimensions: OK", file=sys.stderr)
     # Neighboring nodes correctness
     assert e0.neighbors == [n0, n1]
     assert e1.neighbors == [n2, n0]
     assert e2.neighbors == [n1, n2]
     assert e3.neighbors == [n4, n2, n3]
-    print('Neighboring nodes: OK', file=sys.stderr)
+    print("Neighboring nodes: OK", file=sys.stderr)
     # Tensors correctness
     assert tensors[0].shape == (2, 4, 2)
     assert tensors[1].shape == (2, 5, 5)
@@ -405,32 +421,43 @@ def small_graph_test(empty_graph: TensorGraph, key: Array):
     assert tensors[3].shape == (6, 4)
     assert tensors[4].shape == (6, 6)
     assert len(tensors) == 5
-    print('Initialized tensor shapes: OK', file=sys.stderr)
+    print("Initialized tensor shapes: OK", file=sys.stderr)
     # Messages correctness
-    assert messages[(0,         (0, 1)   )].shape == (2, 2)
-    assert messages[((0, 1),     0       )].shape == (2, 2)
-    assert messages[(0,         (2, 0)   )].shape == (4, 4)
-    assert messages[((2, 0),     0       )].shape == (4, 4)
-    assert messages[(1,         (0, 1)   )].shape == (2, 2)
-    assert messages[((0, 1),     1       )].shape == (2, 2)
-    assert messages[(1,         (1, 2)   )].shape == (5, 5)
-    assert messages[((1, 2),     1       )].shape == (5, 5)
-    assert messages[(2,         (2, 0)   )].shape == (4, 4)
-    assert messages[((2, 0),     2       )].shape == (4, 4)
-    assert messages[((1, 2),     2       )].shape == (5, 5)
-    assert messages[(2,         (1, 2)   )].shape == (5, 5)
-    assert messages[(2,         (4, 2, 3))].shape == (6, 6)
-    assert messages[((4, 2, 3),  2       )].shape == (6, 6)
-    assert messages[(3,         (4, 2, 3))].shape == (6, 6)
-    assert messages[((4, 2, 3),  3       )].shape == (6, 6)
-    assert messages[(4,         (4, 2, 3))].shape == (6, 6)
-    assert messages[((4, 2, 3),  4       )].shape == (6, 6)
+    assert messages[(0, (0, 1))].shape == (2, 2)
+    assert messages[((0, 1), 0)].shape == (2, 2)
+    assert messages[(0, (2, 0))].shape == (4, 4)
+    assert messages[((2, 0), 0)].shape == (4, 4)
+    assert messages[(1, (0, 1))].shape == (2, 2)
+    assert messages[((0, 1), 1)].shape == (2, 2)
+    assert messages[(1, (1, 2))].shape == (5, 5)
+    assert messages[((1, 2), 1)].shape == (5, 5)
+    assert messages[(2, (2, 0))].shape == (4, 4)
+    assert messages[((2, 0), 2)].shape == (4, 4)
+    assert messages[((1, 2), 2)].shape == (5, 5)
+    assert messages[(2, (1, 2))].shape == (5, 5)
+    assert messages[(2, (4, 2, 3))].shape == (6, 6)
+    assert messages[((4, 2, 3), 2)].shape == (6, 6)
+    assert messages[(3, (4, 2, 3))].shape == (6, 6)
+    assert messages[((4, 2, 3), 3)].shape == (6, 6)
+    assert messages[(4, (4, 2, 3))].shape == (6, 6)
+    assert messages[((4, 2, 3), 4)].shape == (6, 6)
     assert len(messages) == 18
-    print('Initialized message shapes: OK', file=sys.stderr)
+    print("Initialized message shapes: OK", file=sys.stderr)
     #  Elements traversal
     empty_graph.add_node()
-    nodes_subset = { n0, n1, n2, n3, n4, }
-    edges_subset = { e0, e1, e2, e3, }
+    nodes_subset = {
+        n0,
+        n1,
+        n2,
+        n3,
+        n4,
+    }
+    edges_subset = {
+        e0,
+        e1,
+        e2,
+        e3,
+    }
     elements_set = set()
     for element in empty_graph.get_traversal_iterator(e1.id, "dfs") or iter([]):
         elements_set.add(element)
@@ -443,10 +470,12 @@ def small_graph_test(empty_graph: TensorGraph, key: Array):
     assert elements_set.issuperset(nodes_subset)
     assert elements_set.issuperset(edges_subset)
     assert len(elements_set) == 9
-    print('Elements traversal: OK', file=sys.stderr)
+    print("Elements traversal: OK", file=sys.stderr)
 
 
-def lattice_3d_test(sizes: Tuple[int, int, int], bond_dim: int, phys_dim: int, key: Array):
+def lattice_3d_test(
+    sizes: Tuple[int, int, int], bond_dim: int, phys_dim: int, key: Array
+):
     lattice = get_nd_lattice(list(sizes), phys_dim, bond_dim)
     tensor_initializer = get_tensor_random_normal_initializer(key)
     _, key = split(key)
@@ -454,55 +483,216 @@ def lattice_3d_test(sizes: Tuple[int, int, int], bond_dim: int, phys_dim: int, k
     tensors = lattice.init_tensors(tensor_initializer)
     messages = lattice.init_messages(messages_initializer)
     # Checking corner tensors of the lattice
-    assert tensors[(0,            0,            0           )].shape == (bond_dim, bond_dim, bond_dim, phys_dim)
-    assert tensors[(sizes[0] - 1, 0,            0           )].shape == (bond_dim, bond_dim, bond_dim, phys_dim)
-    assert tensors[(0,            sizes[1] - 1, 0           )].shape == (bond_dim, bond_dim, bond_dim, phys_dim)
-    assert tensors[(sizes[0] - 1, sizes[1] - 1, 0           )].shape == (bond_dim, bond_dim, bond_dim, phys_dim)
-    assert tensors[(0,            0,            sizes[2] - 1)].shape == (bond_dim, bond_dim, bond_dim, phys_dim)
-    assert tensors[(sizes[0] - 1, 0,            sizes[2] - 1)].shape == (bond_dim, bond_dim, bond_dim, phys_dim)
-    assert tensors[(0,            sizes[1] - 1, sizes[2] - 1)].shape == (bond_dim, bond_dim, bond_dim, phys_dim)
-    assert tensors[(sizes[0] - 1, sizes[1] - 1, sizes[2] - 1)].shape == (bond_dim, bond_dim, bond_dim, phys_dim)
-    print('Corner tensor shapes: OK', file=sys.stderr)
+    assert tensors[(0, 0, 0)].shape == (bond_dim, bond_dim, bond_dim, phys_dim)
+    assert tensors[(sizes[0] - 1, 0, 0)].shape == (
+        bond_dim,
+        bond_dim,
+        bond_dim,
+        phys_dim,
+    )
+    assert tensors[(0, sizes[1] - 1, 0)].shape == (
+        bond_dim,
+        bond_dim,
+        bond_dim,
+        phys_dim,
+    )
+    assert tensors[(sizes[0] - 1, sizes[1] - 1, 0)].shape == (
+        bond_dim,
+        bond_dim,
+        bond_dim,
+        phys_dim,
+    )
+    assert tensors[(0, 0, sizes[2] - 1)].shape == (
+        bond_dim,
+        bond_dim,
+        bond_dim,
+        phys_dim,
+    )
+    assert tensors[(sizes[0] - 1, 0, sizes[2] - 1)].shape == (
+        bond_dim,
+        bond_dim,
+        bond_dim,
+        phys_dim,
+    )
+    assert tensors[(0, sizes[1] - 1, sizes[2] - 1)].shape == (
+        bond_dim,
+        bond_dim,
+        bond_dim,
+        phys_dim,
+    )
+    assert tensors[(sizes[0] - 1, sizes[1] - 1, sizes[2] - 1)].shape == (
+        bond_dim,
+        bond_dim,
+        bond_dim,
+        phys_dim,
+    )
+    print("Corner tensor shapes: OK", file=sys.stderr)
     # Checking 1d edges of the lattice
     for i in range(1, sizes[0] - 2):
-        assert tensors[(i, 0,            0           )].shape == (bond_dim, bond_dim, bond_dim, bond_dim, phys_dim)
-        assert tensors[(i, sizes[1] - 1, 0           )].shape == (bond_dim, bond_dim, bond_dim, bond_dim, phys_dim)
-        assert tensors[(i, 0           , sizes[2] - 1)].shape == (bond_dim, bond_dim, bond_dim, bond_dim, phys_dim)
-        assert tensors[(i, sizes[1] - 1, sizes[2] - 1)].shape == (bond_dim, bond_dim, bond_dim, bond_dim, phys_dim)
+        assert tensors[(i, 0, 0)].shape == (
+            bond_dim,
+            bond_dim,
+            bond_dim,
+            bond_dim,
+            phys_dim,
+        )
+        assert tensors[(i, sizes[1] - 1, 0)].shape == (
+            bond_dim,
+            bond_dim,
+            bond_dim,
+            bond_dim,
+            phys_dim,
+        )
+        assert tensors[(i, 0, sizes[2] - 1)].shape == (
+            bond_dim,
+            bond_dim,
+            bond_dim,
+            bond_dim,
+            phys_dim,
+        )
+        assert tensors[(i, sizes[1] - 1, sizes[2] - 1)].shape == (
+            bond_dim,
+            bond_dim,
+            bond_dim,
+            bond_dim,
+            phys_dim,
+        )
     for i in range(1, sizes[1] - 2):
-        assert tensors[(0,            i, 0          )].shape == (bond_dim, bond_dim, bond_dim, bond_dim, phys_dim)
-        assert tensors[(sizes[0] - 1, i, 0           )].shape == (bond_dim, bond_dim, bond_dim, bond_dim, phys_dim)
-        assert tensors[(0,            i, sizes[2] - 1)].shape == (bond_dim, bond_dim, bond_dim, bond_dim, phys_dim)
-        assert tensors[(sizes[0] - 1, i, sizes[2] - 1)].shape == (bond_dim, bond_dim, bond_dim, bond_dim, phys_dim)
+        assert tensors[(0, i, 0)].shape == (
+            bond_dim,
+            bond_dim,
+            bond_dim,
+            bond_dim,
+            phys_dim,
+        )
+        assert tensors[(sizes[0] - 1, i, 0)].shape == (
+            bond_dim,
+            bond_dim,
+            bond_dim,
+            bond_dim,
+            phys_dim,
+        )
+        assert tensors[(0, i, sizes[2] - 1)].shape == (
+            bond_dim,
+            bond_dim,
+            bond_dim,
+            bond_dim,
+            phys_dim,
+        )
+        assert tensors[(sizes[0] - 1, i, sizes[2] - 1)].shape == (
+            bond_dim,
+            bond_dim,
+            bond_dim,
+            bond_dim,
+            phys_dim,
+        )
     for i in range(1, sizes[2] - 2):
-        assert tensors[(0,            0,            i)].shape == (bond_dim, bond_dim, bond_dim, bond_dim, phys_dim)
-        assert tensors[(sizes[0] - 1, 0,            i)].shape == (bond_dim, bond_dim, bond_dim, bond_dim, phys_dim)
-        assert tensors[(0,            sizes[1] - 1, i)].shape == (bond_dim, bond_dim, bond_dim, bond_dim, phys_dim)
-        assert tensors[(sizes[0] - 1, sizes[1] - 1, i)].shape == (bond_dim, bond_dim, bond_dim, bond_dim, phys_dim)
-    print('1d edge tensor shapes: OK', file=sys.stderr)
+        assert tensors[(0, 0, i)].shape == (
+            bond_dim,
+            bond_dim,
+            bond_dim,
+            bond_dim,
+            phys_dim,
+        )
+        assert tensors[(sizes[0] - 1, 0, i)].shape == (
+            bond_dim,
+            bond_dim,
+            bond_dim,
+            bond_dim,
+            phys_dim,
+        )
+        assert tensors[(0, sizes[1] - 1, i)].shape == (
+            bond_dim,
+            bond_dim,
+            bond_dim,
+            bond_dim,
+            phys_dim,
+        )
+        assert tensors[(sizes[0] - 1, sizes[1] - 1, i)].shape == (
+            bond_dim,
+            bond_dim,
+            bond_dim,
+            bond_dim,
+            phys_dim,
+        )
+    print("1d edge tensor shapes: OK", file=sys.stderr)
     # Checking 2d edges of the lattice
     for i in range(1, sizes[0] - 2):
         for j in range(1, sizes[1] - 2):
-            assert tensors[(i, j, 0           )].shape == (bond_dim, bond_dim, bond_dim, bond_dim, bond_dim, phys_dim)
-            assert tensors[(i, j, sizes[2] - 1)].shape == (bond_dim, bond_dim, bond_dim, bond_dim, bond_dim, phys_dim)
+            assert tensors[(i, j, 0)].shape == (
+                bond_dim,
+                bond_dim,
+                bond_dim,
+                bond_dim,
+                bond_dim,
+                phys_dim,
+            )
+            assert tensors[(i, j, sizes[2] - 1)].shape == (
+                bond_dim,
+                bond_dim,
+                bond_dim,
+                bond_dim,
+                bond_dim,
+                phys_dim,
+            )
     for i in range(1, sizes[0] - 2):
         for j in range(1, sizes[2] - 2):
-            assert tensors[(i, 0,            j)].shape == (bond_dim, bond_dim, bond_dim, bond_dim, bond_dim, phys_dim)
-            assert tensors[(i, sizes[1] - 1, j)].shape == (bond_dim, bond_dim, bond_dim, bond_dim, bond_dim, phys_dim)
+            assert tensors[(i, 0, j)].shape == (
+                bond_dim,
+                bond_dim,
+                bond_dim,
+                bond_dim,
+                bond_dim,
+                phys_dim,
+            )
+            assert tensors[(i, sizes[1] - 1, j)].shape == (
+                bond_dim,
+                bond_dim,
+                bond_dim,
+                bond_dim,
+                bond_dim,
+                phys_dim,
+            )
     for i in range(1, sizes[1] - 2):
         for j in range(1, sizes[2] - 2):
-            assert tensors[(0,            i, j)].shape == (bond_dim, bond_dim, bond_dim, bond_dim, bond_dim, phys_dim)
-            assert tensors[(sizes[0] - 1, i, j)].shape == (bond_dim, bond_dim, bond_dim, bond_dim, bond_dim, phys_dim)
-    print('2d edge tensor shapes: OK', file=sys.stderr)
+            assert tensors[(0, i, j)].shape == (
+                bond_dim,
+                bond_dim,
+                bond_dim,
+                bond_dim,
+                bond_dim,
+                phys_dim,
+            )
+            assert tensors[(sizes[0] - 1, i, j)].shape == (
+                bond_dim,
+                bond_dim,
+                bond_dim,
+                bond_dim,
+                bond_dim,
+                phys_dim,
+            )
+    print("2d edge tensor shapes: OK", file=sys.stderr)
     # Checking lattice internal tensors
     for i in range(1, sizes[0] - 2):
         for j in range(1, sizes[1] - 2):
             for k in range(1, sizes[2] - 2):
-                assert tensors[(i, j, k)].shape == (bond_dim, bond_dim, bond_dim, bond_dim, bond_dim, bond_dim, phys_dim)
-    print('Internal tensor shapes: OK', file=sys.stderr)
+                assert tensors[(i, j, k)].shape == (
+                    bond_dim,
+                    bond_dim,
+                    bond_dim,
+                    bond_dim,
+                    bond_dim,
+                    bond_dim,
+                    phys_dim,
+                )
+    print("Internal tensor shapes: OK", file=sys.stderr)
     # Checking nodes / edges / messages number
     nodes_number = sizes[0] * sizes[1] * sizes[2]
-    edges_number = (sizes[0] - 1) * sizes[1] * sizes[2] + sizes[0] * (sizes[1] - 1) * sizes[2] + sizes[0] * sizes[1] * (sizes[2] - 1)
+    edges_number = (
+        (sizes[0] - 1) * sizes[1] * sizes[2]
+        + sizes[0] * (sizes[1] - 1) * sizes[2]
+        + sizes[0] * sizes[1] * (sizes[2] - 1)
+    )
     messages_number = 4 * edges_number
     edges_set = set()
     nodes_set = set()
@@ -512,19 +702,22 @@ def lattice_3d_test(sizes: Tuple[int, int, int], bond_dim: int, phys_dim: int, k
         elif isinstance(element, Edge):
             edges_set.add(element)
         else:
-            raise NotImplementedError("This is unreachable branch if the code is correct.")
+            raise NotImplementedError(
+                "This is unreachable branch if the code is correct."
+            )
     assert len(nodes_set) == nodes_number
     assert len(tensors) == nodes_number
     assert len(messages) == messages_number
     assert len(edges_set) == edges_number
-    print('Nodes / Edges / Messages number: OK')
+    print("Nodes / Edges / Messages number: OK")
     # Checking phys. dimension and bond dimension
     for element in lattice.get_traversal_iterator() or iter([]):
         if isinstance(element, Node):
             element.dimension == phys_dim
         elif isinstance(element, Edge):
             element.dimension == bond_dim
-    print('Physical dimensions and bond dimensions: OK')
+    print("Physical dimensions and bond dimensions: OK")
+
 
 def random_tree_test(
     nodes_number: int,
@@ -532,7 +725,9 @@ def random_tree_test(
     bond_dimension: int,
     key: Array,
 ):
-    tree = get_random_tree_tensor_graph(nodes_number, phys_dimension, bond_dimension, key)
+    tree = get_random_tree_tensor_graph(
+        nodes_number, phys_dimension, bond_dimension, key
+    )
     # Checking nodes / edges number
     assert tree.nodes_number == nodes_number
     assert tree.edges_number == nodes_number - 1
@@ -548,7 +743,9 @@ def random_tree_test(
             assert element.dimension == bond_dimension
             traversed_edges_number += 1
         else:
-            raise NotImplementedError("This is unreachable branch if the code is correct.")
+            raise NotImplementedError(
+                "This is unreachable branch if the code is correct."
+            )
     assert traversed_nodes_number == nodes_number
     assert traversed_edges_number == nodes_number - 1
     print("Connectivity / phys. dimension / bond dimension: OK")

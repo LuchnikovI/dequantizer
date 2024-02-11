@@ -11,7 +11,10 @@ Args:
 Returns:
     Initializer."""
 
-def get_message_random_nonnegative_initializer(key: Array) -> Callable[[MessageDir], Array]:
+
+def get_message_random_nonnegative_initializer(
+    key: Array,
+) -> Callable[[MessageDir], Array]:
     def initializer(direction: MessageDir) -> Array:
         if isinstance(direction[0], Edge):
             d = direction[0].dimension
@@ -20,4 +23,5 @@ def get_message_random_nonnegative_initializer(key: Array) -> Callable[[MessageD
         message_sq = normal(key, (d, d, 2))
         message_sq = message_sq[..., 0] + 1j * message_sq[..., 1]
         return message_sq @ message_sq.conj().T
+
     return initializer

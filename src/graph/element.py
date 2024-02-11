@@ -15,6 +15,7 @@ MessageID = Tuple[ElementID, ElementID]
 
 """An element of a tensor graph."""
 
+
 class Element:
 
     def __init__(self, dimension: int, id: ElementID):
@@ -40,6 +41,7 @@ class Element:
         pass
 
     """Gets neighboring elements list."""
+
     @property
     @abstractmethod
     def neighbors(self) -> List["Element"]:
