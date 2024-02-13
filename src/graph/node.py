@@ -1,5 +1,6 @@
 from typing import List
-from element import Element, NodeID
+from .element import Element, NodeID
+from jax import Array
 
 """Node class."""
 
@@ -16,8 +17,6 @@ class Node(Element):
     @property
     def bond_shape(self) -> tuple[int, ...]:
         return self.__bond_shape
-
-    """Gets the node degree (number of bond indices)."""
 
     @property
     def degree(self) -> int:

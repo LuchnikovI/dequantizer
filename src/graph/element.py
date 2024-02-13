@@ -16,7 +16,7 @@ MessageID = Tuple[ElementID, ElementID]
 """An element of a tensor graph."""
 
 
-class Element:
+class Element(ABC):
 
     def __init__(self, dimension: int, id: ElementID):
         self.__id = id
@@ -45,6 +45,13 @@ class Element:
     @property
     @abstractmethod
     def neighbors(self) -> List["Element"]:
+        pass
+
+    """Gets degree of the element (number of neighboring elements)."""
+
+    @property
+    @abstractmethod
+    def degree(self) -> int:
         pass
 
 

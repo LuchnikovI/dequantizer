@@ -1,5 +1,5 @@
 from jax.random import PRNGKey
-from tensor_graph import (
+from ..graph import (
     TensorGraph,
     small_graph_test,
     lattice_3d_test,

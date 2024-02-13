@@ -2,8 +2,8 @@ from typing import Callable
 import jax.numpy as jnp
 from jax import Array
 from jax.random import normal
-from edge import Edge
-from element import MessageDir
+from .edge import Edge
+from .element import MessageDir
 
 """Returns an initializer that initializes a message given the message direction.
 Args:

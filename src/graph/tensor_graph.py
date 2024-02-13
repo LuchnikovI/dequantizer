@@ -12,11 +12,12 @@ from typing import (
 from collections import deque
 from jax import Array
 from jax.random import split, randint
-from node import Node
-from edge import Edge
-from tensor_initializers import get_tensor_random_normal_initializer
-from message_initializer import get_message_random_nonnegative_initializer
-from element import NodeID, EdgeID, MessageID, MessageDir
+import jax.numpy as jnp
+from .node import Node
+from .edge import Edge
+from .tensor_initializers import get_tensor_random_normal_initializer
+from .message_initializer import get_message_random_nonnegative_initializer
+from .element import NodeID, EdgeID, MessageID, MessageDir
 
 """The tensor network wrapper class."""
 
@@ -214,28 +215,23 @@ class TensorGraph:
                         message_dict[(element.id, node.id)] = message
         return message_dict
 
-    """Returns a function that performs one iteration of belief propagation.
+    """Truncates the given graph inplace and corresponding tensors and core edge tensors.
     Args:
-        traverser: an iterator that traverse elements of a tensor graph (nodes and edges).
+        tensors: node tensors;
+        core_edge_tensors: core edge tensors;
+        accuracy: the maximal truncation error, not considered if None;
+        max_rank: the maximal allowed edge dimension, not considered if None.
     Returns:
-        A function that performs one iteration of belief propagation. It takes
-            the list of tensors, dict with messages and returns updated messages.
+        tuple with truncated node tensors and truncated core edge tensors.
     """
 
-    def get_message_passing_map(
-        self, traverser: Iterator[Union[Node, Edge]]
-    ) -> Callable[
-        [Dict[NodeID, Array], Dict[MessageID, Array]], Dict[MessageID, Array]
-    ]:
-        raise NotImplementedError()
-
-    """Returns a function that computes a distance to the vidal gauge.
-    The function takes the list of tensors, dict with messages and returns
-    distance to the vidal gauge."""
-
-    def get_vidal_gauge_distance_map(
+    def truncate(
         self,
-    ) -> Callable[[Dict[NodeID, Array], Dict[MessageID, Array]], Array]:
+        tensors: Dict[NodeID, Array],
+        core_edge_tensors: Dict[EdgeID, Array],
+        accuracy: Optional[Union[float, Array]],
+        max_rank: Optional[int] = None,
+    ) -> Tuple[Dict[NodeID, Array], Dict[EdgeID, Array]]:
         raise NotImplementedError()
 
 
@@ -381,13 +377,17 @@ def small_graph_test(empty_graph: TensorGraph, key: Array):
     assert n3.dimension == 4
     assert n4.dimension == 6
     print("Node dimensions: OK", file=sys.stderr)
-    # Tensor ranks correctness
+    # Node / edge degree correctness
     assert n0.degree == 2
     assert n1.degree == 2
     assert n2.degree == 3
     assert n3.degree == 1
     assert n4.degree == 1
-    print("Node degrees: OK", file=sys.stderr)
+    assert e0.degree == 2
+    assert e1.degree == 2
+    assert e2.degree == 2
+    assert e3.degree == 3
+    print("Node / edge degrees: OK", file=sys.stderr)
     # Tensor shape correctness
     assert n0.bond_shape == (2, 4)
     assert n1.bond_shape == (2, 5)
@@ -441,6 +441,8 @@ def small_graph_test(empty_graph: TensorGraph, key: Array):
     assert messages[((4, 2, 3), 3)].shape == (6, 6)
     assert messages[(4, (4, 2, 3))].shape == (6, 6)
     assert messages[((4, 2, 3), 4)].shape == (6, 6)
+    m = messages[((4, 2, 3), 4)]
+    assert (jnp.linalg.eigvalsh(m) > -1e-5).all()
     assert len(messages) == 18
     print("Initialized message shapes: OK", file=sys.stderr)
     #  Elements traversal

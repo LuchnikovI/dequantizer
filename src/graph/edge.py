@@ -1,5 +1,5 @@
 from typing import List
-from element import Element, EdgeID
+from .element import Element, EdgeID
 
 """Edge class."""
 
@@ -12,6 +12,10 @@ class Edge(Element):
 
     def _add_element(self, node: Element):
         self.__neighbors.append(node)
+
+    @property
+    def degree(self) -> int:
+        return len(self.__neighbors)
 
     @property
     def neighbors(self) -> List[Element]:
