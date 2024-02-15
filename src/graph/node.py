@@ -1,22 +1,15 @@
 from typing import List
 from .element import Element, NodeID
-from jax import Array
 
 """Node class."""
 
 
 class Node(Element):
 
-    def __init__(self, dimension: int, id: NodeID):
-        super().__init__(dimension, id)
+    def __init__(self, dimension: int, node_id: NodeID):
+        super().__init__(dimension, node_id)
         self.__bond_shape: tuple[int, ...] = ()
         self.__neighbors: List[Element] = []
-
-    """Gets the shape of the node tensor except the physical dimension."""
-
-    @property
-    def bond_shape(self) -> tuple[int, ...]:
-        return self.__bond_shape
 
     @property
     def degree(self) -> int:
@@ -29,3 +22,13 @@ class Node(Element):
     @property
     def neighbors(self) -> List[Element]:
         return self.__neighbors
+
+    """Gets the shape of the node tensor except the physical dimension."""
+
+    @property
+    def bond_shape(self) -> tuple[int, ...]:
+        return self.__bond_shape
+
+    @bond_shape.setter
+    def bond_shape(self, value: tuple[int, ...]):
+        self.__bond_shape = value

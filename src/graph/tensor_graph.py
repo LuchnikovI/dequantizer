@@ -10,14 +10,16 @@ from typing import (
     Optional,
 )
 from collections import deque
+import jax.numpy as jnp
+from jax.lax import dynamic_slice
 from jax import Array
 from jax.random import split, randint
-import jax.numpy as jnp
 from .node import Node
 from .edge import Edge
 from .tensor_initializers import get_tensor_random_normal_initializer
 from .message_initializer import get_message_random_nonnegative_initializer
 from .element import NodeID, EdgeID, MessageID, MessageDir
+from .tensor_utils import _find_rank
 
 """The tensor network wrapper class."""
 
@@ -27,8 +29,8 @@ class TensorGraph:
 
     def __init__(self):
         self.__default_starting_node: Optional[Node] = None
-        self.__nodes: Dict[NodeID, Node] = dict()
-        self.__edges: Dict[EdgeID, Edge] = dict()
+        self.__nodes: Dict[NodeID, Node] = {}
+        self.__edges: Dict[EdgeID, Edge] = {}
         self.__nodes_number: int = 0
         self.__edges_number: int = 0
 
@@ -52,8 +54,8 @@ class TensorGraph:
     Returns:
         ID of the node."""
 
-    def add_node(self, phys_dim: int = 2, id: Optional[NodeID] = None) -> NodeID:
-        new_id = id or self.__nodes_number
+    def add_node(self, phys_dim: int = 2, node_id: Optional[NodeID] = None) -> NodeID:
+        new_id = node_id or self.__nodes_number
         if self.__nodes.get(new_id) is None:
             self.__nodes[new_id] = Node(phys_dim, new_id)
         else:
@@ -89,23 +91,23 @@ class TensorGraph:
 
     """Returns a node given the node ID. If a node with a given ID does not exist, returns None."""
 
-    def get_node(self, id: NodeID) -> Optional[Node]:
-        return self.__nodes.get(id)
+    def get_node(self, node_id: NodeID) -> Optional[Node]:
+        return self.__nodes.get(node_id)
 
     """Returns True if the node with the given ID exists or False if does not."""
 
-    def does_node_exist(self, id: NodeID) -> bool:
-        return id in self.__nodes
+    def does_node_exist(self, node_id: NodeID) -> bool:
+        return node_id in self.__nodes
 
     """Returns True if the edge with the given ID exists or False if does not."""
 
-    def does_edge_exist(self, id: EdgeID) -> bool:
-        return id in self.__edges
+    def does_edge_exist(self, edge_id: EdgeID) -> bool:
+        return edge_id in self.__edges
 
     """Returns an edge given the edge ID. If an edge with a given IF does not exist, returns None."""
 
-    def get_edge(self, id: EdgeID) -> Optional[Edge]:
-        return self.__edges.get(id)
+    def get_edge(self, edge_id: EdgeID) -> Optional[Edge]:
+        return self.__edges.get(edge_id)
 
     """Returns an iterator over tensor graph elements (nodes and edges).
     Args:
@@ -126,9 +128,15 @@ class TensorGraph:
         stack: deque = deque()
         pop_fn: Callable[[deque[Union[Node, Edge]]], Union[Node, Edge]]
         if ordering == "bfs":
-            pop_fn = lambda d: d.popleft()
+
+            def pop_fn(d):
+                return d.popleft()
+
         elif ordering == "dfs":
-            pop_fn = lambda d: d.pop()
+
+            def pop_fn(d):
+                return d.pop()
+
         else:
             # TODO: custom exception for this error
             raise KeyError(f"Nodes / edges ordering method {ordering} is unknown.")
@@ -138,8 +146,7 @@ class TensorGraph:
         if starting_id is None:
             if self.__default_starting_node is None:
                 return None
-            else:
-                starting_element = self.__default_starting_node
+            starting_element = self.__default_starting_node
         elif isinstance(starting_id, tuple):
             optional_starting_element = self.__edges.get(starting_id)
             if optional_starting_element is not None:
@@ -170,21 +177,20 @@ class TensorGraph:
         A dict mapping a node IDs to tensors."""
 
     def init_tensors(self, initializer: Callable[[Node], Array]) -> Dict[NodeID, Array]:
-        tensors_dict: Dict[NodeID, Array] = dict()
+        tensors_dict: Dict[NodeID, Array] = {}
         elements_iterator = self.get_traversal_iterator()
         if elements_iterator is None:
             return tensors_dict
-        else:
-            for element in elements_iterator:
-                if isinstance(element, Node):
-                    tensor = initializer(element)
-                    expected_shape = (*element.bond_shape, element.dimension)
-                    if expected_shape == tensor.shape:
-                        tensors_dict[element.id] = tensor
-                    else:
-                        raise ValueError(
-                            f"Expected tensor of shape {expected_shape} got tensor of shape {tensor.shape}."
-                        )
+        for element in elements_iterator:
+            if isinstance(element, Node):
+                tensor = initializer(element)
+                expected_shape = (*element.bond_shape, element.dimension)
+                if expected_shape == tensor.shape:
+                    tensors_dict[element.id] = tensor
+                else:
+                    raise ValueError(
+                        f"Expected tensor of shape {expected_shape} got tensor of shape {tensor.shape}."
+                    )
         return tensors_dict
 
     """Returns a dict with initialized messages that is used later in pure functions
@@ -199,7 +205,7 @@ class TensorGraph:
         self,
         initializer: Callable[[MessageDir], Array],
     ) -> Dict[MessageID, Array]:
-        message_dict: Dict[MessageID, Array] = dict()
+        message_dict: Dict[MessageID, Array] = {}
         elements_iterator = self.get_traversal_iterator()
         if elements_iterator is None:
             return message_dict
@@ -208,11 +214,11 @@ class TensorGraph:
                 if isinstance(element, Node):
                     for edge in element.neighbors:
                         message = initializer((element, edge))
-                        message_dict[(element.id, edge.id)] = message
+                        message_dict[MessageID(src=element.id, dst=edge.id)] = message
                 elif isinstance(element, Edge):
                     for node in element.neighbors:
                         message = initializer((element, node))
-                        message_dict[(element.id, node.id)] = message
+                        message_dict[MessageID(src=element.id, dst=node.id)] = message
         return message_dict
 
     """Truncates the given graph inplace and corresponding tensors and core edge tensors.
@@ -232,7 +238,23 @@ class TensorGraph:
         accuracy: Optional[Union[float, Array]],
         max_rank: Optional[int] = None,
     ) -> Tuple[Dict[NodeID, Array], Dict[EdgeID, Array]]:
-        raise NotImplementedError()
+        truncated_core_edge_tensors: Dict[EdgeID, Array] = {}
+        truncated_tensors: Dict[NodeID, Array] = {}
+        for edge_id, core_edge_tensor in core_edge_tensors.items():
+            rank = _find_rank(core_edge_tensor, accuracy, max_rank)
+            truncated_core_edge_tensors[edge_id] = core_edge_tensor[:rank]
+            self.__edges[edge_id].dimension = int(rank)
+        for node_id, node in self.__nodes.items():
+            tensor = tensors[node_id]
+            new_bond_shape: List[int] = []
+            for neighbor in node.neighbors:
+                new_bond_shape.append(neighbor.dimension)
+            node.bond_shape = tuple(new_bond_shape)
+            truncated_tensor = dynamic_slice(
+                tensor, (node.degree + 1) * [0], new_bond_shape + [tensor.shape[-1]]
+            )
+            truncated_tensors[node_id] = truncated_tensor
+        return truncated_tensors, truncated_core_edge_tensors
 
 
 """Returns a random tree tensor graph whose nodes are labeled by
@@ -240,7 +262,7 @@ sequential integer numbers starting from 0.
 Args:
     nodes_number: nodes number;
     phys_dimension: dimension of the physical space per node;
-    bond_dimension: internal indices dimension;
+    bond_dimensions: list of possible bond dimensions sampled randomly;
     key: jax random number generator seed.
 Return:
     random tree tensor graph."""
@@ -249,7 +271,7 @@ Return:
 def get_random_tree_tensor_graph(
     nodes_number: int,
     phys_dimension: int,
-    bond_dimension: int,
+    bond_dimensions: List[int],
     key: Array,
 ) -> TensorGraph:
     random_tree = TensorGraph()
@@ -269,7 +291,9 @@ def get_random_tree_tensor_graph(
             int(randint(subkey, (1,), 0, disconnected_set_size)[0])
         ]
         random_tree.add_node(phys_dimension, disconnected_id)
-        random_tree.add_edge((connected_id, disconnected_id), bond_dimension)
+        key, subkey = split(key)
+        idx = randint(subkey, shape=(1,), minval=0, maxval=len(bond_dimensions))[0]
+        random_tree.add_edge((connected_id, disconnected_id), bond_dimensions[idx])
         disconnected_nodes.remove(disconnected_id)
         connected_nodes.append(disconnected_id)
     return random_tree
@@ -293,15 +317,15 @@ def get_nd_lattice(
     for size in lattice_sizes:
         nodes_number *= size
     lattice = TensorGraph()
-    id: List[int]
+    node_id: List[int]
     ids: List[List[int]] = []
     for i in range(nodes_number):
-        id = []
+        node_id = []
         for size in lattice_sizes:
-            id.append(i % size)
+            node_id.append(i % size)
             i //= size
-        lattice.add_node(phys_dimension, tuple(id))
-        ids.append(id)
+        lattice.add_node(phys_dimension, tuple(node_id))
+        ids.append(node_id)
     for j in ids:
         for pos in range(len(j)):
             next_j = j.copy()
@@ -423,25 +447,25 @@ def small_graph_test(empty_graph: TensorGraph, key: Array):
     assert len(tensors) == 5
     print("Initialized tensor shapes: OK", file=sys.stderr)
     # Messages correctness
-    assert messages[(0, (0, 1))].shape == (2, 2)
-    assert messages[((0, 1), 0)].shape == (2, 2)
-    assert messages[(0, (2, 0))].shape == (4, 4)
-    assert messages[((2, 0), 0)].shape == (4, 4)
-    assert messages[(1, (0, 1))].shape == (2, 2)
-    assert messages[((0, 1), 1)].shape == (2, 2)
-    assert messages[(1, (1, 2))].shape == (5, 5)
-    assert messages[((1, 2), 1)].shape == (5, 5)
-    assert messages[(2, (2, 0))].shape == (4, 4)
-    assert messages[((2, 0), 2)].shape == (4, 4)
-    assert messages[((1, 2), 2)].shape == (5, 5)
-    assert messages[(2, (1, 2))].shape == (5, 5)
-    assert messages[(2, (4, 2, 3))].shape == (6, 6)
-    assert messages[((4, 2, 3), 2)].shape == (6, 6)
-    assert messages[(3, (4, 2, 3))].shape == (6, 6)
-    assert messages[((4, 2, 3), 3)].shape == (6, 6)
-    assert messages[(4, (4, 2, 3))].shape == (6, 6)
-    assert messages[((4, 2, 3), 4)].shape == (6, 6)
-    m = messages[((4, 2, 3), 4)]
+    assert messages[MessageID(0, (0, 1))].shape == (2, 2)
+    assert messages[MessageID((0, 1), 0)].shape == (2, 2)
+    assert messages[MessageID(0, (2, 0))].shape == (4, 4)
+    assert messages[MessageID((2, 0), 0)].shape == (4, 4)
+    assert messages[MessageID(1, (0, 1))].shape == (2, 2)
+    assert messages[MessageID((0, 1), 1)].shape == (2, 2)
+    assert messages[MessageID(1, (1, 2))].shape == (5, 5)
+    assert messages[MessageID((1, 2), 1)].shape == (5, 5)
+    assert messages[MessageID(2, (2, 0))].shape == (4, 4)
+    assert messages[MessageID((2, 0), 2)].shape == (4, 4)
+    assert messages[MessageID((1, 2), 2)].shape == (5, 5)
+    assert messages[MessageID(2, (1, 2))].shape == (5, 5)
+    assert messages[MessageID(2, (4, 2, 3))].shape == (6, 6)
+    assert messages[MessageID((4, 2, 3), 2)].shape == (6, 6)
+    assert messages[MessageID(3, (4, 2, 3))].shape == (6, 6)
+    assert messages[MessageID((4, 2, 3), 3)].shape == (6, 6)
+    assert messages[MessageID(4, (4, 2, 3))].shape == (6, 6)
+    assert messages[MessageID((4, 2, 3), 4)].shape == (6, 6)
+    m = messages[MessageID((4, 2, 3), 4)]
     assert (jnp.linalg.eigvalsh(m) > -1e-5).all()
     assert len(messages) == 18
     print("Initialized message shapes: OK", file=sys.stderr)
@@ -724,11 +748,11 @@ def lattice_3d_test(
 def random_tree_test(
     nodes_number: int,
     phys_dimension: int,
-    bond_dimension: int,
+    bond_dimensions: List[int],
     key: Array,
 ):
     tree = get_random_tree_tensor_graph(
-        nodes_number, phys_dimension, bond_dimension, key
+        nodes_number, phys_dimension, bond_dimensions, key
     )
     # Checking nodes / edges number
     assert tree.nodes_number == nodes_number
@@ -742,7 +766,6 @@ def random_tree_test(
             assert element.dimension == phys_dimension
             traversed_nodes_number += 1
         elif isinstance(element, Edge):
-            assert element.dimension == bond_dimension
             traversed_edges_number += 1
         else:
             raise NotImplementedError(

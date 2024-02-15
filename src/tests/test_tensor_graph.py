@@ -20,4 +20,4 @@ def test_3d_lattice():
 
 def test_random_tree():
     key = PRNGKey(44)
-    random_tree_test(20, 3, 5, key)
+    random_tree_test(20, 3, [3, 4, 5, 6], key)

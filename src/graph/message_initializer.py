@@ -1,5 +1,4 @@
 from typing import Callable
-import jax.numpy as jnp
 from jax import Array
 from jax.random import normal
 from .edge import Edge

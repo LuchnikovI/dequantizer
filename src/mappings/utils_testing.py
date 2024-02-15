@@ -1,7 +1,6 @@
 from typing import List
-import copy
 import jax.numpy as jnp
-from jax import Array
+from jax import Array, jit
 from jax.random import split
 from ..graph import (
     get_random_tree_tensor_graph,
@@ -19,24 +18,30 @@ from .vidal_distance import get_vidal_gauge_distance_map
 def random_tree_ghz_gauge_fixing_test(
     nodes_number: int,
     phys_dimension: int,
-    bond_dimension: int,
+    bond_dimensions: List[int],
     accuracy: Array,
     key: Array,
 ):
+    import jax
+
+    jax.config.update("jax_platform_name", "cpu")
     tree = get_random_tree_tensor_graph(
         nodes_number,
         phys_dimension,
-        bond_dimension,
+        bond_dimensions,
         key,
     )
+    traverser = list(tree.get_traversal_iterator() or iter([]))
     # A map that performs on belief propagation (BP) iteration
-    bp_map = get_belief_propagation_map(tree.get_traversal_iterator() or iter([]))
+    bp_map = jit(
+        get_belief_propagation_map(traverser),
+    )
     # A map that fixes the Vidal gauge
-    vg_map = get_vidal_gauge_fixing_map(tree.get_traversal_iterator() or iter([]))
+    vg_map = get_vidal_gauge_fixing_map(traverser, accuracy)
     # A map that returns distance between to sets of messages
-    vd_map = get_vidal_gauge_distance_map(tree.get_traversal_iterator() or iter([]))
+    vd_map = get_vidal_gauge_distance_map(traverser)
     # A map that fixes the symmetric gauge
-    sg_map = get_symmetric_gauge_fixing_map(tree.get_traversal_iterator() or iter([]))
+    sg_map = get_symmetric_gauge_fixing_map(traverser)
     # Initialization of tensors & messages
     tensors_initializer = get_tensor_bloated_ghz_initializer(key)
     _, key = split(key)
@@ -44,7 +49,7 @@ def random_tree_ghz_gauge_fixing_test(
     tensors = tree.init_tensors(tensors_initializer)
     messages = tree.init_messages(messages_initializer)
     # BP until convergence
-    dist = jnp.finfo(jnp.float32).max
+    dist: Array = jnp.array(jnp.finfo(jnp.float32).max)
     while dist > accuracy:
         new_messages = bp_map(tensors, messages)
         dist = messages_frob_distance(new_messages, messages)
@@ -56,6 +61,12 @@ def random_tree_ghz_gauge_fixing_test(
     truncated_tensors, truncated_edge_core_tensors = tree.truncate(
         new_tensors, edge_core_tensors, accuracy
     )
+    for element in tree.get_traversal_iterator() or iter([]):
+        if isinstance(element, Edge):
+            assert element.dimension == phys_dimension, element.dimension
+        else:
+            for dim in element.bond_shape:
+                assert dim == phys_dimension, element.bond_shape
     tensors = sg_map(truncated_tensors, truncated_edge_core_tensors)
     _, key = split(key)
     messages_initializer = get_message_random_nonnegative_initializer(key)
@@ -76,5 +87,5 @@ def random_tree_ghz_gauge_fixing_test(
         assert (
             jnp.abs(m - jnp.eye(phys_dimension) / jnp.sqrt(float(phys_dimension)))
             < accuracy
-        )
+        ).all()
     print("All messages ~ I: OK")

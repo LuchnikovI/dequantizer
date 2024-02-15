@@ -6,8 +6,8 @@ from .element import Element, EdgeID
 
 class Edge(Element):
 
-    def __init__(self, dimension: int, id: EdgeID):
-        super().__init__(dimension, id)
+    def __init__(self, dimension: int, edge_id: EdgeID):
+        super().__init__(dimension, edge_id)
         self.__neighbors: List[Element] = []
 
     def _add_element(self, node: Element):

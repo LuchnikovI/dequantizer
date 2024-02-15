@@ -6,7 +6,7 @@ def test_random_tree_ghz_gauge_fixing():
     random_tree_ghz_gauge_fixing_test(
         20,
         3,
-        4,
-        1 - 8,
+        [3, 4, 5],
+        1e-8,
         PRNGKey(42),
     )
