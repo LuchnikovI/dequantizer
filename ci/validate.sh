@@ -7,7 +7,7 @@ script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
 
 log INFO "Running type checking..."
 
-python3 -m mypy "${script_dir}/../src"
+python3 -m mypy "${script_dir}/../dequantizer"
 
 if [[ $? -eq 0 ]]; then
     log INFO Type checking: OK
@@ -18,7 +18,7 @@ fi
 
 log INFO "Running tests..."
 
-python3 -m pytest -vvv "${script_dir}/../src"
+python3 -m pytest -vvv "${script_dir}/../dequantizer"
 
 if [[ $? -eq 0 ]]; then
     log INFO Tests: OK
@@ -29,7 +29,7 @@ fi
 
 log INFO "Running linter..."
 
-python3 -m pylint --fail-under=8.3 "${script_dir}/../src"
+python3 -m pylint --fail-under=8.3 "${script_dir}/../dequantizer"
 
 if [[ $? -eq 0 ]]; then
     log INFO Linting: OK
@@ -40,7 +40,7 @@ fi
 
 log INFO "Running format checker..."
 
-python3 -m black --check "${script_dir}/../src"
+python3 -m black --check "${script_dir}/../dequantizer"
 
 if [[ $? -eq 0 ]]; then
     log INFO Formating: OK

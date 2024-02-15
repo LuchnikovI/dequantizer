@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=43.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools-git-versioning]
+enabled = true
+
+[project]
+name = "dequantizer"
+dynamic = ["version"]
+requires-python = ">=3.10"
+readme = "README.md"
+
+authors = [
+  { name = "Ilia Luchnikov", email = "ilia.luchnikov@tii.ae" }
+]
+
+dependencies = [
+  "jax",
+  "numpy",
+]
