@@ -109,6 +109,15 @@ class TensorGraph:
     def get_edge(self, edge_id: EdgeID) -> Optional[Edge]:
         return self.__edges.get(edge_id)
 
+    # """Returns Edge IDs corresponding to the spanning tree that covers
+    # maximal sum of bond dimensions."""
+
+    # def get_maximal_spanning_tree(self) -> Set[EdgeID]:
+    #    spanning_tree: Set[EdgeID] = set()
+    #    connected_nodes: List[Node] = [ self.__nodes.items().__iter__().__next__()[1] ]
+    #    cut_edges: Set[Edge] = {  }
+    #    raise NotImplementedError()
+
     """Returns an iterator over tensor graph elements (nodes and edges).
     Args:
         starting_id: either node or edge from which the traversal starts.
@@ -122,7 +131,7 @@ class TensorGraph:
 
     def get_traversal_iterator(
         self,
-        starting_id: Optional[Union[NodeID, EdgeID]] = None,
+        starting_element: Optional[Union[Node, Edge]] = None,
         ordering: str = "bfs",
     ) -> Optional[Iterator[Union[Node, Edge]]]:
         stack: deque = deque()
@@ -142,24 +151,12 @@ class TensorGraph:
             raise KeyError(f"Nodes / edges ordering method {ordering} is unknown.")
         visited_ids: Set[Union[NodeID, EdgeID]] = set()
         optional_starting_element: Optional[Union[Node, Edge]]
-        starting_element: Union[Node, Edge]
-        if starting_id is None:
+        if starting_element is None:
             if self.__default_starting_node is None:
                 return None
-            starting_element = self.__default_starting_node
-        elif isinstance(starting_id, tuple):
-            optional_starting_element = self.__edges.get(starting_id)
-            if optional_starting_element is not None:
-                starting_element = optional_starting_element
-            else:
-                raise KeyError(f"Edge with ID {starting_id} does not exists.")
+            stack.append(self.__default_starting_node)
         else:
-            optional_starting_element = self.__nodes.get(starting_id)
-            if optional_starting_element is not None:
-                starting_element = optional_starting_element
-            else:
-                raise KeyError(f"Node with ID {starting_id} does not exists.")
-        stack.append(starting_element)
+            stack.append(starting_element)
         while len(stack) != 0:
             element = pop_fn(stack)
             if element.id not in visited_ids:
@@ -303,7 +300,8 @@ def get_random_tree_tensor_graph(
 by tuples of the following kind (size0, size1, size2, ...).
 Args:
     lattice_sizes: sizes of lattice sides;
-    bond_dimension: internal indices dimension.
+    bond_dimension: internal indices dimension;
+    open_boundary: indicates if to use open boundary conditions or periodic.
 Returns:
     lattice tensor graph."""
 
@@ -312,6 +310,7 @@ def get_nd_lattice(
     lattice_sizes: List[int],
     phys_dimension: int,
     bond_dimension: int,
+    open_boundary: bool = True,
 ) -> TensorGraph:
     nodes_number = 1
     for size in lattice_sizes:
@@ -331,6 +330,9 @@ def get_nd_lattice(
             next_j = j.copy()
             next_j[pos] += 1
             if lattice.does_node_exist(tuple(next_j)):
+                lattice.add_edge((tuple(j), tuple(next_j)), bond_dimension)
+            elif not open_boundary:
+                next_j[pos] = 0
                 lattice.add_edge((tuple(j), tuple(next_j)), bond_dimension)
     return lattice
 
@@ -485,13 +487,13 @@ def small_graph_test(empty_graph: TensorGraph, key: Array):
         e3,
     }
     elements_set = set()
-    for element in empty_graph.get_traversal_iterator(e1.id, "dfs") or iter([]):
+    for element in empty_graph.get_traversal_iterator(e1, "dfs") or iter([]):
         elements_set.add(element)
     assert elements_set.issuperset(nodes_subset)
     assert elements_set.issuperset(edges_subset)
     assert len(elements_set) == 9
     elements_set = set()
-    for element in empty_graph.get_traversal_iterator(n2.id, "bfs") or iter([]):
+    for element in empty_graph.get_traversal_iterator(n2, "bfs") or iter([]):
         elements_set.add(element)
     assert elements_set.issuperset(nodes_subset)
     assert elements_set.issuperset(edges_subset)

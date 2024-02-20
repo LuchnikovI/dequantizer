@@ -13,5 +13,6 @@ from .tensor_initializers import (
     get_tensor_random_normal_initializer,
     get_tensor_std_state_initializer,
     get_tensor_bloated_ghz_initializer,
+    get_potts_initializer,
 )
 from .message_initializer import get_message_random_nonnegative_initializer

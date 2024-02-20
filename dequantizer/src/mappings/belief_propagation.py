@@ -11,6 +11,7 @@ from .tensor_ops import pass_through_node, pass_through_edge
 """Returns a function that performs one iteration of belief propagation.
 Args:
     traverser: an iterator that traverse elements of a tensor graph (nodes and edges).
+    is_synchronous: a flag specifying if the update is synchronous;
 Returns:
     A function that performs one iteration of belief propagation. It takes
         the list of tensors, dict with messages and returns updated messages.
@@ -21,7 +22,8 @@ Notes:
 
 
 def get_belief_propagation_map(
-    traverser: Iterable[Union[Node, Edge]]
+    traverser: Iterable[Union[Node, Edge]],
+    is_synchronous: bool = False,
 ) -> Callable[[Dict[NodeID, Array], Dict[MessageID, Array]], Dict[MessageID, Array]]:
     def gauge_fixing_map(
         tensors: Dict[NodeID, Array], messages: Dict[MessageID, Array]
@@ -32,11 +34,14 @@ def get_belief_propagation_map(
             for neighbor in element.neighbors:
                 message_id = MessageID(src=neighbor.id, dst=element.id)
                 neighboring_message: Array
-                trial_updated_message = updated_messages.get(message_id)
-                if trial_updated_message is None:
+                if is_synchronous:
                     neighboring_message = messages[message_id]
                 else:
-                    neighboring_message = trial_updated_message
+                    trial_updated_message = updated_messages.get(message_id)
+                    if trial_updated_message is None:
+                        neighboring_message = messages[message_id]
+                    else:
+                        neighboring_message = trial_updated_message
                 neighboring_messages.append(neighboring_message)
             updated_neighboring_messages: List[Array]
             if isinstance(element, Node):

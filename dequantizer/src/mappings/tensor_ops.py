@@ -1,6 +1,7 @@
 from typing import List, Tuple
 import jax.numpy as jnp
 from jax import Array
+from jax.lax import round
 
 
 def _safe_inverse(lmbd: Array, eps: Array) -> Array:
@@ -97,8 +98,8 @@ def edge_svd(incoming_messages: List[Array], eps: Array) -> Tuple[List[Array], A
     m_sq_inv_b = ub @ (jnp.sqrt(_safe_inverse(lb, eps))[:, jnp.newaxis] * ub.conj().T)
     m_sq_f = uf @ (jnp.sqrt(jnp.abs(lf))[:, jnp.newaxis] * uf.conj().T)
     m_sq_b = ub @ (jnp.sqrt(jnp.abs(lb))[:, jnp.newaxis] * ub.conj().T)
-    u, lmbd, _ = jnp.linalg.svd(m_sq_f @ m_sq_b.T)
-    return [m_sq_inv_f @ u, m_sq_inv_b @ u.conj()], lmbd
+    u, lmbd, v = jnp.linalg.svd(jnp.tensordot(m_sq_f, m_sq_b, axes=[1, 1]))
+    return [m_sq_inv_f @ u, m_sq_inv_b @ v.T], lmbd
 
 
 """Computes Vidal distance for a single tensor.
@@ -132,12 +133,22 @@ def vidal_dist(tensor: Array, neighboring_core_edge_tensors: List[Array]) -> Arr
         )
         down_part = down_part.reshape((down_part.shape[0], -1))
         result = jnp.tensordot(down_part, up_part, axes=[1, 1])
-        result /= result[0, 0]
-        rank = (jnp.diag(result) > 0.5).sum()
-        ideal = jnp.zeros(result.shape)
-        ideal = ideal.at[:rank, :rank].set(jnp.eye(rank))
-        dist += jnp.linalg.norm(result - ideal)
-    return dist / degree
+        result_trace = jnp.trace(result)
+        result /= result_trace
+        rank = round(1 / jnp.abs(result[0, 0]))
+        ideal = jnp.eye(result.shape[0])
+        mask = (
+            jnp.maximum(
+                jnp.arange(ideal.shape[0])[:, jnp.newaxis],
+                jnp.arange(ideal.shape[0])[jnp.newaxis],
+            )
+            < rank
+        )
+        ideal = ideal * mask
+        ideal /= jnp.trace(ideal)
+        _, lmbd, _ = jnp.linalg.svd(ideal - result)
+        dist += jnp.sum(lmbd)
+    return dist
 
 
 """Multiply a given tensor by sqrt of lambdas from all sides. It is necessary to

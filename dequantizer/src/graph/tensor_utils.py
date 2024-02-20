@@ -10,4 +10,7 @@ def _find_rank(
         if rank is None:
             return jnp.array(lmbd.shape[0])
         return jnp.array(rank)
-    return lmbd.shape[0] - (jnp.sqrt(jnp.cumsum(lmbd[::-1] ** 2)) < accuracy).sum()
+    scale = jnp.sqrt((lmbd**2).sum())
+    return (
+        lmbd.shape[0] - (jnp.sqrt(jnp.cumsum(lmbd[::-1] ** 2)) / scale < accuracy).sum()
+    )

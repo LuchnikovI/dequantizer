@@ -20,7 +20,7 @@ def get_vidal_gauge_distance_map(
         tensors: Dict[NodeID, Array], core_edge_tensors: Dict[EdgeID, Array]
     ) -> Array:
         dist = jnp.array(0.0)
-        nodes_counter = 0
+        edges_counter = 0
         for element in traverser:
             if isinstance(element, Node):
                 neighboring_core_tensors: List[Array] = []
@@ -33,7 +33,8 @@ def get_vidal_gauge_distance_map(
                             "This branch is unreachable if the code is correct."
                         )
                 dist += vidal_dist(tensors[element.id], neighboring_core_tensors)
-                nodes_counter += 1
-        return dist / nodes_counter
+            if isinstance(element, Edge):
+                edges_counter += 1
+        return dist / (2 * edges_counter)
 
     return vidal_gauge_distance

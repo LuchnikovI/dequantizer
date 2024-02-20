@@ -77,3 +77,62 @@ def get_tensor_bloated_ghz_initializer(key: Array) -> Callable[[Node], Array]:
         return ghz_core
 
     return initializer
+
+
+"""Generates a node tensor that corresponds to a lattice whose
+contraction with itself leads to the partition function
+of a Potts model.
+Args:
+    two_spin_factor: a factor responsible for coupling between spins
+        (must be symmetric);
+    single_spin_factor: a factor responsible for energy of a single spin.
+Return:
+    Initializer."""
+
+
+def get_potts_initializer(
+    two_spin_factor: Array,
+    single_spin_factor: Array,
+) -> Callable[[Node], Array]:
+    if len(single_spin_factor.shape) != 1:
+        raise ValueError("A single spin factor must be a tensor of rank 1.")
+    if len(two_spin_factor.shape) != 2:
+        raise ValueError("A two spin factor must be a tensor of rank 2.")
+    if two_spin_factor.shape[0] != two_spin_factor.shape[1]:
+        raise ValueError("A two spin facto must have the same dimension per index.")
+    if two_spin_factor.shape[0] != single_spin_factor.shape[0]:
+        raise ValueError(
+            "Index dimension of a single spin factor must match the dimension of two factor indices."
+        )
+    phys_dim = single_spin_factor.shape[0]
+    single_spin_factor = jnp.sqrt(single_spin_factor)
+    two_spin_factor = jnp.sqrt(two_spin_factor)
+    lmbd, u = jnp.linalg.eigh(two_spin_factor)
+    lmbd = jnp.array(lmbd, dtype=jnp.complex128)
+    sqrt_two_spins_factor = (u * jnp.sqrt(lmbd)[jnp.newaxis]).T
+    assert (
+        jnp.linalg.norm(
+            jnp.tensordot(sqrt_two_spins_factor, sqrt_two_spins_factor, axes=[0, 0])
+            - two_spin_factor
+        )
+        < 1e-5
+    )
+
+    def initializer(node: Node) -> Array:
+        if node.dimension != phys_dim:
+            raise ValueError(
+                "Node dimension must match with the factor index dimension."
+            )
+        tensor = single_spin_factor
+        for neighbor in node.neighbors:
+            if neighbor.dimension != phys_dim:
+                raise ValueError(
+                    "Bond dimensions of the node must match dimension of the factor indices."
+                )
+            tensor = tensor[..., jnp.newaxis, :] * sqrt_two_spins_factor
+        assert tensor.shape == (node.degree + 1) * (
+            phys_dim,
+        ), f"{tensor.shape}, {(node.degree + 1) * (phys_dim,)}"
+        return tensor
+
+    return initializer

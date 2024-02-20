@@ -3,3 +3,4 @@ from .vidal_gauge import get_vidal_gauge_fixing_map
 from .vidal_distance import get_vidal_gauge_distance_map
 from .symmetric_gauge import get_symmetric_gauge_fixing_map
 from .messages_distance import messages_frob_distance
+from .density_matrix import get_one_side_density_matrix

@@ -7,12 +7,14 @@ from ..graph import (
     get_message_random_nonnegative_initializer,
     get_tensor_bloated_ghz_initializer,
     Edge,
+    Node,
 )
 from .belief_propagation import get_belief_propagation_map
 from .vidal_gauge import get_vidal_gauge_fixing_map
 from .symmetric_gauge import get_symmetric_gauge_fixing_map
 from .messages_distance import messages_frob_distance
 from .vidal_distance import get_vidal_gauge_distance_map
+from .density_matrix import get_one_side_density_matrix
 
 
 def random_tree_ghz_gauge_fixing_test(
@@ -89,3 +91,11 @@ def random_tree_ghz_gauge_fixing_test(
             < accuracy
         ).all()
     print("All messages ~ I: OK")
+    # Checking partial density matrices
+    for element in tree.get_traversal_iterator() or iter([]):
+        if isinstance(element, Node):
+            dens = get_one_side_density_matrix(element, tensors, messages)
+            assert (
+                jnp.linalg.norm(dens - jnp.eye(phys_dimension) / phys_dimension)
+                < accuracy
+            )
