@@ -25,10 +25,13 @@ def get_one_side_density_matrix(
     conj_tensor = jnp.transpose(conj_tensor, [degree, *range(degree)]).reshape(
         (tensor.shape[-1], -1)
     )
-    for neighbor in node.neighbors:
+    neighbors = node.neighbors
+    assert len(neighbors) == len(tensor.shape) - 1
+    for neighbor in neighbors:
         message = messages[MessageID(neighbor.id, node.id)]
         tensor = jnp.tensordot(tensor, message, axes=[0, 1])
-    tensor = tensor.reshape((tensor.shape[-1], -1))
+    tensor = tensor.reshape((tensor.shape[0], -1))
+    assert tensor.shape == conj_tensor.shape, f"{tensor.shape}, {conj_tensor.shape}"
     dens = jnp.tensordot(tensor, conj_tensor, axes=[1, 1])
     dens /= jnp.trace(dens)
     return dens

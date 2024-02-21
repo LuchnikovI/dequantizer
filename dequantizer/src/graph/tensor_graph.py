@@ -13,13 +13,17 @@ from collections import deque
 import jax.numpy as jnp
 from jax.lax import dynamic_slice
 from jax import Array
-from jax.random import split, randint
+from jax.random import split, randint, PRNGKey
 from .node import Node
 from .edge import Edge
-from .tensor_initializers import get_tensor_random_normal_initializer
+from .tensor_initializers import (
+    get_tensor_random_normal_initializer,
+    get_tensor_std_state_initializer,
+)
 from .message_initializer import get_message_random_nonnegative_initializer
 from .element import NodeID, EdgeID, MessageID, MessageDir
 from .tensor_utils import _find_rank
+from .tensor_ops import apply_gate_halves, _decompose_gate
 
 """The tensor network wrapper class."""
 
@@ -150,7 +154,6 @@ class TensorGraph:
             # TODO: custom exception for this error
             raise KeyError(f"Nodes / edges ordering method {ordering} is unknown.")
         visited_ids: Set[Union[NodeID, EdgeID]] = set()
-        optional_starting_element: Optional[Union[Node, Edge]]
         if starting_element is None:
             if self.__default_starting_node is None:
                 return None
@@ -253,6 +256,94 @@ class TensorGraph:
             truncated_tensors[node_id] = truncated_tensor
         return truncated_tensors, truncated_core_edge_tensors
 
+    """Applies a single-side gate to a given node.
+    Args:
+        node_id: id of a node where to apply a gate;
+        tensors: node tensors;
+        gate: a matrix specifying a single-side gate.
+    Returns:
+        updated tensors."""
+
+    def apply1(
+        self, node_id: NodeID, tensors: Dict[NodeID, Array], gate: Array
+    ) -> Dict[NodeID, Array]:
+        tensor = tensors[node_id]
+        tensor = jnp.tensordot(tensor, gate, axes=[-1, 0])
+        tensor /= jnp.linalg.norm(tensor)
+        tensors[node_id] = tensor
+        return tensors
+
+    """Applies a two-sides gate to a given subset of sides connected but the given edge.
+    Args:
+        controlling_node_id: first node affected by a gate (can be seen as a controlling node);
+        controlled_node_id: second node affected by a gate (can be seen as a controlled node);
+        tensors: node tensors;
+        gate: rank 4 tensor that represents a gate;
+        accuracy: accuracy of gate truncation.
+    Returns:
+        updated tensors, note also, that this method modifies a network itself."""
+
+    def apply2(
+        self,
+        controlling_node_id: NodeID,
+        controlled_node_id: NodeID,
+        tensors: Dict[NodeID, Array],
+        gate: Array,
+        threshold: Union[Array, float],
+    ) -> Dict[NodeID, Array]:
+        if len(gate.shape) != 4:
+            raise ValueError("Gate must be a tensor of rank 4.")
+        if gate.shape[3] != gate.shape[1] or gate.shape[2] != gate.shape[0]:
+            raise ValueError("Input - output dimensions must match with each other.")
+        trial_id1 = (controlled_node_id, controlling_node_id)
+        trial_id2 = (controlling_node_id, controlled_node_id)
+        edge = self.get_edge(trial_id1) or self.get_edge(trial_id2)
+        if edge is None:
+            raise ValueError(
+                f"Neither edge with ID {trial_id1} nor with ID {trial_id2} is found in the tensor graph."
+            )
+        if edge.degree != 2:
+            raise NotImplementedError("apply2 is implemented only for two qubits.")
+        assert len(edge.neighbors) == edge.degree
+        node1 = self.get_node(controlling_node_id)
+        node2 = self.get_node(controlled_node_id)
+        if not isinstance(node1, Node) or not isinstance(node2, Node):
+            raise NotImplementedError(
+                "This branch is unreachable if the code is correct."
+            )
+        tensor1 = tensors[node1.id]
+        tensor2 = tensors[node2.id]
+        edge_id = edge.id
+        if not isinstance(edge_id, tuple):
+            raise NotImplementedError(
+                "This branch is unreachable if the code is correct."
+            )
+        index1 = node1.indices[edge_id]
+        index2 = node2.indices[edge_id]
+        half1, half2 = _decompose_gate(gate, threshold)
+        gate_rank = half1.shape[0]
+        tensor1, tensor2 = apply_gate_halves(
+            tensor1, tensor2, index1, index2, half1, half2
+        )
+        tensors[node1.id] = tensor1
+        tensors[node2.id] = tensor2
+        edge.dimension = gate_rank * edge.dimension
+        node1.bond_shape = tensor1.shape[:-1]
+        node2.bond_shape = tensor2.shape[:-1]
+        assert (
+            edge.dimension == tensors[node1.id].shape[index1]
+        ), f"{edge.dimension}, {tensors[node1.id].shape[index1]}"
+        assert (
+            edge.dimension == tensors[node2.id].shape[index2]
+        ), f"{edge.dimension}, {tensors[node2.id].shape[index2]}"
+        assert (
+            node1.bond_shape == tensors[node1.id].shape[:-1]
+        ), f"{node1.bond_shape}, {tensors[node1.id].shape[:-1]}"
+        assert (
+            node2.bond_shape == tensors[node2.id].shape[:-1]
+        ), f"{node2.bond_shape}, {tensors[node2.id].shape[:-1]}"
+        return tensors
+
 
 """Returns a random tree tensor graph whose nodes are labeled by
 sequential integer numbers starting from 0.
@@ -334,6 +425,80 @@ def get_nd_lattice(
             elif not open_boundary:
                 next_j[pos] = 0
                 lattice.add_edge((tuple(j), tuple(next_j)), bond_dimension)
+    return lattice
+
+
+"""Returns a tensor graph corresponding to the heavy hex lattice architecture
+of IBM Eagle processor with 127 qubits.
+See Fig. 1 from https://arxiv.org/abs/2306.14887 for a reference."""
+
+
+def get_heavy_hex_ibm_eagle_lattice() -> TensorGraph:
+    lattice = TensorGraph()
+    for _ in range(127):
+        lattice.add_node()
+    for i in range(13):
+        lattice.add_edge((i, i + 1), 1)
+    for i in range(18, 33):
+        lattice.add_edge((i, i + 1), 1)
+    for i in range(37, 52):
+        lattice.add_edge((i, i + 1), 1)
+    for i in range(56, 71):
+        lattice.add_edge((i, i + 1), 1)
+    for i in range(75, 90):
+        lattice.add_edge((i, i + 1), 1)
+    for i in range(94, 109):
+        lattice.add_edge((i, i + 1), 1)
+    for i in range(113, 127):
+        lattice.add_edge((i, i + 1), 1)
+    lattice.add_edge((0, 14), 1)
+    lattice.add_edge((14, 18), 1)
+    lattice.add_edge((4, 15), 1)
+    lattice.add_edge((15, 22), 1)
+    lattice.add_edge((8, 16), 1)
+    lattice.add_edge((16, 26), 1)
+    lattice.add_edge((12, 17), 1)
+    lattice.add_edge((17, 30), 1)
+    lattice.add_edge((20, 33), 1)
+    lattice.add_edge((33, 39), 1)
+    lattice.add_edge((24, 34), 1)
+    lattice.add_edge((34, 43), 1)
+    lattice.add_edge((28, 35), 1)
+    lattice.add_edge((35, 47), 1)
+    lattice.add_edge((32, 36), 1)
+    lattice.add_edge((36, 51), 1)
+    lattice.add_edge((37, 52), 1)
+    lattice.add_edge((52, 56), 1)
+    lattice.add_edge((41, 53), 1)
+    lattice.add_edge((53, 60), 1)
+    lattice.add_edge((45, 54), 1)
+    lattice.add_edge((54, 64), 1)
+    lattice.add_edge((49, 55), 1)
+    lattice.add_edge((55, 68), 1)
+    lattice.add_edge((58, 71), 1)
+    lattice.add_edge((71, 77), 1)
+    lattice.add_edge((62, 72), 1)
+    lattice.add_edge((72, 81), 1)
+    lattice.add_edge((66, 73), 1)
+    lattice.add_edge((73, 85), 1)
+    lattice.add_edge((70, 74), 1)
+    lattice.add_edge((74, 89), 1)
+    lattice.add_edge((75, 90), 1)
+    lattice.add_edge((90, 94), 1)
+    lattice.add_edge((79, 91), 1)
+    lattice.add_edge((91, 98), 1)
+    lattice.add_edge((83, 92), 1)
+    lattice.add_edge((92, 102), 1)
+    lattice.add_edge((87, 93), 1)
+    lattice.add_edge((93, 106), 1)
+    lattice.add_edge((96, 109), 1)
+    lattice.add_edge((109, 114), 1)
+    lattice.add_edge((100, 110), 1)
+    lattice.add_edge((110, 118), 1)
+    lattice.add_edge((104, 111), 1)
+    lattice.add_edge((111, 122), 1)
+    lattice.add_edge((108, 112), 1)
+    lattice.add_edge((112, 126), 1)
     return lattice
 
 
@@ -776,3 +941,108 @@ def random_tree_test(
     assert traversed_nodes_number == nodes_number
     assert traversed_edges_number == nodes_number - 1
     print("Connectivity / phys. dimension / bond dimension: OK")
+
+
+def ghz_state_preparation_test():
+    from ..mappings.belief_propagation import get_belief_propagation_map
+    from ..mappings.vidal_gauge import get_vidal_gauge_fixing_map
+    from ..mappings.symmetric_gauge import get_symmetric_gauge_fixing_map
+    from ..mappings.messages_distance import messages_frob_distance
+    from ..mappings.density_matrix import get_one_side_density_matrix
+
+    lattice = get_nd_lattice([4, 4], 2, 1)
+    print(lattice.nodes_number)
+    tensor_initializer = get_tensor_std_state_initializer()
+    tensors = lattice.init_tensors(tensor_initializer)
+    hadamard = jnp.array(
+        [
+            [1, 1],
+            [1, -1],
+        ],
+        dtype=jnp.complex128,
+    )
+    cnot = jnp.array(
+        [
+            [1, 0, 0, 0],
+            [0, 1, 0, 0],
+            [0, 0, 0, 1],
+            [0, 0, 1, 0],
+        ],
+        dtype=jnp.complex128,
+    ).reshape((2, 2, 2, 2))
+    tensors = lattice.apply1((0, 0), tensors, hadamard)
+    tensors = lattice.apply2((0, 0), (0, 1), tensors, cnot, 1e-8)
+    tensors = lattice.apply2((0, 1), (0, 2), tensors, cnot, 1e-8)
+    tensors = lattice.apply2((0, 2), (0, 3), tensors, cnot, 1e-8)
+    tensors = lattice.apply2((0, 0), (1, 0), tensors, cnot, 1e-8)
+    tensors = lattice.apply2((0, 1), (1, 1), tensors, cnot, 1e-8)
+    tensors = lattice.apply2((0, 2), (1, 2), tensors, cnot, 1e-8)
+    tensors = lattice.apply2((0, 3), (1, 3), tensors, cnot, 1e-8)
+    tensors = lattice.apply2((1, 0), (2, 0), tensors, cnot, 1e-8)
+    tensors = lattice.apply2((2, 0), (2, 1), tensors, cnot, 1e-8)
+    tensors = lattice.apply2((2, 1), (2, 2), tensors, cnot, 1e-8)
+    tensors = lattice.apply2((2, 2), (2, 3), tensors, cnot, 1e-8)
+    tensors = lattice.apply2((2, 3), (3, 3), tensors, cnot, 1e-8)
+    tensors = lattice.apply2((3, 3), (3, 2), tensors, cnot, 1e-8)
+    tensors = lattice.apply2((2, 1), (3, 1), tensors, cnot, 1e-8)
+    tensors = lattice.apply2((2, 0), (3, 0), tensors, cnot, 1e-8)
+    message_initializer = get_message_random_nonnegative_initializer(PRNGKey(42))
+    messages = lattice.init_messages(message_initializer)
+    dist = jnp.finfo(jnp.float64).max
+    traverser = list(lattice.get_traversal_iterator() or iter([]))
+    bp_map = get_belief_propagation_map(traverser)
+    vg_map = get_vidal_gauge_fixing_map(traverser, 1e-8)
+    sg_map = get_symmetric_gauge_fixing_map(traverser)
+    while dist > 1e-8:
+        new_messages = bp_map(tensors, messages)
+        dist = messages_frob_distance(new_messages, messages)
+        messages = new_messages
+    for i in range(4):
+        for j in range(4):
+            dens = get_one_side_density_matrix(
+                lattice.get_node((i, j)), tensors, messages
+            )
+            assert jnp.isclose(dens, jnp.eye(2) / 2).all()
+    tensors = lattice.apply2((2, 0), (3, 0), tensors, cnot, 1e-8)
+    tensors = lattice.apply2((2, 1), (3, 1), tensors, cnot, 1e-8)
+    tensors = lattice.apply2((3, 3), (3, 2), tensors, cnot, 1e-8)
+    tensors = lattice.apply2((2, 3), (3, 3), tensors, cnot, 1e-8)
+    tensors = lattice.apply2((2, 2), (2, 3), tensors, cnot, 1e-8)
+    tensors = lattice.apply2((2, 1), (2, 2), tensors, cnot, 1e-8)
+    tensors = lattice.apply2((2, 0), (2, 1), tensors, cnot, 1e-8)
+    tensors = lattice.apply2((1, 0), (2, 0), tensors, cnot, 1e-8)
+    tensors = lattice.apply2((0, 3), (1, 3), tensors, cnot, 1e-8)
+    tensors = lattice.apply2((0, 2), (1, 2), tensors, cnot, 1e-8)
+    tensors = lattice.apply2((0, 1), (1, 1), tensors, cnot, 1e-8)
+    tensors = lattice.apply2((0, 0), (1, 0), tensors, cnot, 1e-8)
+    tensors = lattice.apply2((0, 2), (0, 3), tensors, cnot, 1e-8)
+    tensors = lattice.apply2((0, 1), (0, 2), tensors, cnot, 1e-8)
+    tensors = lattice.apply2((0, 0), (0, 1), tensors, cnot, 1e-8)
+    tensors = lattice.apply1((0, 0), tensors, hadamard)
+    message_initializer = get_message_random_nonnegative_initializer(PRNGKey(43))
+    messages = lattice.init_messages(message_initializer)
+    dist = jnp.finfo(jnp.float64).max
+    while dist > 1e-8:
+        new_messages = bp_map(tensors, messages)
+        dist = messages_frob_distance(new_messages, messages)
+        messages = new_messages
+    tensors, lmbds = vg_map(tensors, messages)
+    tensors, lmbds = lattice.truncate(tensors, lmbds, 1e-8)
+    tensors = sg_map(tensors, lmbds)
+    message_initializer = get_message_random_nonnegative_initializer(PRNGKey(44))
+    messages = lattice.init_messages(message_initializer)
+    while dist > 1e-8:
+        new_messages = bp_map(tensors, messages)
+        dist = messages_frob_distance(new_messages, messages)
+        messages = new_messages
+    for i in range(4):
+        for j in range(4):
+            node = lattice.get_node((i, j))
+            for d, neighbor in zip(node.bond_shape, node.neighbors):
+                assert neighbor.dimension == d, neighbor.dimension
+                assert d == 1, d
+            dens = get_one_side_density_matrix(node, tensors, messages)
+            assert jnp.isclose(
+                dens - jnp.array([1, 0, 0, 0], dtype=jnp.complex128).reshape((2, 2)),
+                1e-8,
+            ).all()

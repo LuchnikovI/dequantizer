@@ -3,6 +3,7 @@ from .tensor_graph import (
     get_nd_lattice,
     get_random_tree_tensor_graph,
     small_graph_test,
+    ghz_state_preparation_test,
     random_tree_test,
     lattice_3d_test,
 )
