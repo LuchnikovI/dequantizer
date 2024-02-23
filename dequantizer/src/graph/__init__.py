@@ -6,6 +6,8 @@ from .tensor_graph import (
     ghz_state_preparation_test,
     random_tree_test,
     lattice_3d_test,
+    get_heavy_hex_ibm_eagle_lattice,
+    get_heavy_hex_ibm_eagle_lattice_infinite,
 )
 from .node import Node, NodeID
 from .edge import Edge, EdgeID

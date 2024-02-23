@@ -7,7 +7,7 @@ from ..graph import (
     MessageID,
     EdgeID,
 )
-from .tensor_ops import edge_svd, absorb_by_node
+from ..tensor_ops import edge_svd, absorb_by_node
 
 """Returns a function that fixes a tensor graph gauge to the Vidal gauge.
 Args:

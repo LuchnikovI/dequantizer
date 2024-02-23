@@ -23,7 +23,7 @@ from .tensor_initializers import (
 from .message_initializer import get_message_random_nonnegative_initializer
 from .element import NodeID, EdgeID, MessageID, MessageDir
 from .tensor_utils import _find_rank
-from .tensor_ops import apply_gate_halves, _decompose_gate
+from ..tensor_ops import apply_gate_halves, simple_update, _decompose_gate
 
 """The tensor network wrapper class."""
 
@@ -273,13 +273,106 @@ class TensorGraph:
         tensors[node_id] = tensor
         return tensors
 
+    """Applies a two-sides gate to a Vidal canonical form, truncates the result if necessary.
+    It preserve the Vidal canonical form up to the truncation error.
+    Args:
+        controlling_node_id: first node affected by a gate (can be seen as a controlling node);
+        controlled_node_id: second node affected by a gate (can be seen as a controlled node);
+        tensors: node tensors;
+        lambdas: singular values that are placed on the edges;
+        gate: a gate that is being applied to the canonical form;
+        threshold: a small value used for regularization purposes;
+        accuracy: the maximal truncation error, not considered if None;
+        max_rank: the maximal allowed edge dimension, not considered if None.
+    Returns:
+        updated tensors and singular values.
+    """
+    def apply2_to_vidal_canonical(
+        self,
+        controlling_node_id: NodeID,
+        controlled_node_id: NodeID,
+        tensors: Dict[NodeID, Array],
+        lambdas: Dict[EdgeID, Array],
+        gate: Array,
+        threshold: Union[Array, float],
+        accuracy: Optional[Union[float, Array]],
+        max_rank: Optional[int] = None,
+    ) -> Tuple[Dict[NodeID, Array], Dict[EdgeID, Array]]:
+        if len(gate.shape) != 4:
+            raise ValueError("Gate must be a tensor of rank 4.")
+        if gate.shape[3] != gate.shape[1] or gate.shape[2] != gate.shape[0]:
+            raise ValueError("Input - output dimensions must match with each other.")
+        trial_id1 = (controlled_node_id, controlling_node_id)
+        trial_id2 = (controlling_node_id, controlled_node_id)
+        edge = self.get_edge(trial_id1) or self.get_edge(trial_id2)
+        if edge is None:
+            raise ValueError(
+                f"Neither edge with ID {trial_id1} nor with ID {trial_id2} is found in the tensor graph."
+            )
+        if edge.degree != 2:
+            raise NotImplementedError("apply2 is implemented only for two qubits.")
+        assert len(edge.neighbors) == edge.degree
+        node1 = self.get_node(controlling_node_id)
+        node2 = self.get_node(controlled_node_id)
+        if not isinstance(node1, Node) or not isinstance(node2, Node):
+            raise NotImplementedError(
+                "This branch is unreachable if the code is correct."
+            )
+        tensor1 = tensors[node1.id]
+        tensor2 = tensors[node2.id]
+        edge_id = edge.id
+        if not isinstance(edge_id, tuple):
+            raise NotImplementedError(
+                "This branch is unreachable if the code is correct."
+            )
+        index1 = node1.indices[edge_id]
+        index2 = node2.indices[edge_id]
+        half1, half2 = _decompose_gate(gate, threshold)
+        lambdas1 = []
+        for neighbor in node1.neighbors:
+            neighbor_id = neighbor.id
+            if isinstance(neighbor_id, tuple):
+                lambdas1.append(lambdas[neighbor_id])
+            else:
+                raise NotImplementedError("This branch is unreachable if the code is correct.")
+        lambdas2 = []
+        for neighbor in node2.neighbors:
+            neighbor_id = neighbor.id
+            if isinstance(neighbor_id, tuple):
+                lambdas2.append(lambdas[neighbor_id])
+            else:
+                raise NotImplementedError("This branch is unreachable if the code is correct.")
+        tensor1, tensor2, lmbd = simple_update(
+            tensor1,
+            tensor2,
+            lambdas1,
+            lambdas2,
+            half1,
+            half2,
+            index1,
+            index2,
+            threshold,
+            accuracy,
+            max_rank,
+        )
+        tensors[node1.id] = tensor1
+        tensors[node2.id] = tensor2
+        edge.dimension = lmbd.shape[0]
+        assert lmbd.shape[0] == tensor1.shape[index1]
+        assert lmbd.shape[0] == tensor2.shape[index2]
+        assert lmbd.shape[0] == edge.dimension
+        node1.bond_shape = tensor1.shape[:-1]
+        node2.bond_shape = tensor2.shape[:-1]
+        lambdas[edge_id] = lmbd
+        return tensors, lambdas
+
     """Applies a two-sides gate to a given subset of sides connected but the given edge.
     Args:
         controlling_node_id: first node affected by a gate (can be seen as a controlling node);
         controlled_node_id: second node affected by a gate (can be seen as a controlled node);
         tensors: node tensors;
         gate: rank 4 tensor that represents a gate;
-        accuracy: accuracy of gate truncation.
+        threshold: threshold of gate truncation.
     Returns:
         updated tensors, note also, that this method modifies a network itself."""
 
@@ -439,17 +532,17 @@ def get_heavy_hex_ibm_eagle_lattice() -> TensorGraph:
         lattice.add_node()
     for i in range(13):
         lattice.add_edge((i, i + 1), 1)
-    for i in range(18, 33):
+    for i in range(18, 32):
         lattice.add_edge((i, i + 1), 1)
-    for i in range(37, 52):
+    for i in range(37, 51):
         lattice.add_edge((i, i + 1), 1)
-    for i in range(56, 71):
+    for i in range(56, 70):
         lattice.add_edge((i, i + 1), 1)
-    for i in range(75, 90):
+    for i in range(75, 89):
         lattice.add_edge((i, i + 1), 1)
-    for i in range(94, 109):
+    for i in range(94, 108):
         lattice.add_edge((i, i + 1), 1)
-    for i in range(113, 127):
+    for i in range(113, 126):
         lattice.add_edge((i, i + 1), 1)
     lattice.add_edge((0, 14), 1)
     lattice.add_edge((14, 18), 1)
@@ -500,6 +593,25 @@ def get_heavy_hex_ibm_eagle_lattice() -> TensorGraph:
     lattice.add_edge((108, 112), 1)
     lattice.add_edge((112, 126), 1)
     return lattice
+
+
+"""Returns a tensor graph corresponding to the heavy hex lattice architecture
+of IBM Eagle processor with infinite number of qubits.
+See Fig. 5 from https://arxiv.org/abs/2306.14887 for a reference."""
+
+
+def get_heavy_hex_ibm_eagle_lattice_infinite() -> TensorGraph:
+    lattice = TensorGraph()
+    for _ in range(5):
+        lattice.add_node(2)
+    lattice.add_edge((0, 1), 1)
+    lattice.add_edge((1, 2), 1)
+    lattice.add_edge((2, 3), 1)
+    lattice.add_edge((2, 4), 1)
+    lattice.add_edge((3, 0), 1)
+    lattice.add_edge((4, 0), 1)
+    return lattice
+    
 
 
 # API testing functions -----------------------------------------------------------------

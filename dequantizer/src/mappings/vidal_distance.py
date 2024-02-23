@@ -2,7 +2,7 @@ from typing import Iterable, Union, Callable, Dict, List
 import jax.numpy as jnp
 from jax import Array
 from ..graph import Node, Edge, EdgeID, NodeID
-from .tensor_ops import vidal_dist
+from ..tensor_ops import vidal_dist
 
 """Returns a function that computes a distance to the vidal gauge.
 The function takes the dict of node tensors and the dict of core edge diagonal tensors

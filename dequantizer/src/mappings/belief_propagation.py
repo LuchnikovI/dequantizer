@@ -6,7 +6,7 @@ from ..graph import (
     Edge,
     MessageID,
 )
-from .tensor_ops import pass_through_node, pass_through_edge
+from ..tensor_ops import pass_through_node, pass_through_edge
 
 """Returns a function that performs one iteration of belief propagation.
 Args:
