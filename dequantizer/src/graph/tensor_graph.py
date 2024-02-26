@@ -287,6 +287,7 @@ class TensorGraph:
     Returns:
         updated tensors and singular values.
     """
+
     def apply2_to_vidal_canonical(
         self,
         controlling_node_id: NodeID,
@@ -334,14 +335,18 @@ class TensorGraph:
             if isinstance(neighbor_id, tuple):
                 lambdas1.append(lambdas[neighbor_id])
             else:
-                raise NotImplementedError("This branch is unreachable if the code is correct.")
+                raise NotImplementedError(
+                    "This branch is unreachable if the code is correct."
+                )
         lambdas2 = []
         for neighbor in node2.neighbors:
             neighbor_id = neighbor.id
             if isinstance(neighbor_id, tuple):
                 lambdas2.append(lambdas[neighbor_id])
             else:
-                raise NotImplementedError("This branch is unreachable if the code is correct.")
+                raise NotImplementedError(
+                    "This branch is unreachable if the code is correct."
+                )
         tensor1, tensor2, lmbd = simple_update(
             tensor1,
             tensor2,
@@ -611,7 +616,6 @@ def get_heavy_hex_ibm_eagle_lattice_infinite() -> TensorGraph:
     lattice.add_edge((3, 0), 1)
     lattice.add_edge((4, 0), 1)
     return lattice
-    
 
 
 # API testing functions -----------------------------------------------------------------

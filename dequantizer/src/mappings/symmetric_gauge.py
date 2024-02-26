@@ -36,12 +36,14 @@ def get_symmetric_gauge_fixing_map(
 
     return symmetric_gauge
 
+
 """Transforms edge core tensors to messages that form a BP stationary point
 for a symmetric gauge.
 Args:
     edge_core_diagonal_tensors: tensors sitting on edges (singular values).
 Returns:
     messages."""
+
 
 def lambdas2messages(
     edge_core_diagonal_tensors: Dict[EdgeID, Array],

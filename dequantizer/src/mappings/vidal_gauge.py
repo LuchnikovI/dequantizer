@@ -19,7 +19,8 @@ Returns:
 
 
 def get_vidal_gauge_fixing_map(
-    traverser: Iterable[Union[Node, Edge]], eps: Array
+    traverser: Iterable[Union[Node, Edge]],
+    eps: Union[Array, float],
 ) -> Callable[
     [Dict[NodeID, Array], Dict[MessageID, Array]],
     Tuple[Dict[NodeID, Array], Dict[EdgeID, Array]],

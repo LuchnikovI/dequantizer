@@ -3,6 +3,7 @@ import jax.numpy as jnp
 from jax import Array
 from jax.lax import round
 
+
 def _find_rank(
     lmbd: Array, accuracy: Optional[Union[float, Array]], rank: Optional[int]
 ) -> Array:
@@ -99,7 +100,9 @@ Note:
     on the case with higher degrees (Tucker / HOSVD / etc?)."""
 
 
-def edge_svd(incoming_messages: List[Array], eps: Union[Array, float]) -> Tuple[List[Array], Array]:
+def edge_svd(
+    incoming_messages: List[Array], eps: Union[Array, float]
+) -> Tuple[List[Array], Array]:
     if len(incoming_messages) != 2:
         raise NotImplementedError(
             "Edge svd is not yet implemented for edge degrees != 2."
@@ -110,7 +113,9 @@ def edge_svd(incoming_messages: List[Array], eps: Union[Array, float]) -> Tuple[
     m_sq_inv_b = ub @ (jnp.sqrt(_safe_inverse(lb, eps))[:, jnp.newaxis] * ub.conj().T)
     m_sq_f = uf @ (jnp.sqrt(jnp.abs(lf))[:, jnp.newaxis] * uf.conj().T)
     m_sq_b = ub @ (jnp.sqrt(jnp.abs(lb))[:, jnp.newaxis] * ub.conj().T)
-    u, lmbd, v = jnp.linalg.svd(jnp.tensordot(m_sq_f, m_sq_b, axes=[1, 1]), full_matrices=False)
+    u, lmbd, v = jnp.linalg.svd(
+        jnp.tensordot(m_sq_f, m_sq_b, axes=[1, 1]), full_matrices=False
+    )
     return [m_sq_inv_f @ u, m_sq_inv_b @ v.T], lmbd
 
 
@@ -180,6 +185,7 @@ def canonicalize(tensor: Array, lambdas: List[Array]) -> Array:
         tensor *= jnp.sqrt(lmbd)
     return tensor
 
+
 def _decompose_gate(gate: Array, threshold: Union[Array, float]) -> Tuple[Array, Array]:
     assert len(gate.shape) == 4
     assert gate.shape[0] == gate.shape[2]
@@ -242,12 +248,13 @@ def apply_gate_halves(
     tensor2 = _apply_half_gate(controlled_tensor, controlled_half, controlled_index)
     return tensor1, tensor2
 
+
 def _simple_update_tensor_preprocessing(
     tensor: Array,
     lambdas: List[Array],
     half_gate: Array,
-    threshold: Union[Array, float], 
-    index: int
+    threshold: Union[Array, float],
+    index: int,
 ) -> Tuple[Array, Array]:
     degree = len(lambdas)
     assert len(tensor.shape) - 1 == degree
@@ -261,16 +268,19 @@ def _simple_update_tensor_preprocessing(
             *range(index),
             *range(index + 1, degree + 1),
             index,
-        ]
+        ],
     )
     shape = tensor.shape
     tensor = tensor.reshape((-1, shape[-1]))
     tensor, message = jnp.linalg.qr(tensor)
     tensor = tensor.reshape((*shape[:-1], -1))
-    for idx, (_, lmbd) in enumerate(filter(lambda x: x[0] != index, enumerate(lambdas))):
+    for idx, (_, lmbd) in enumerate(
+        filter(lambda x: x[0] != index, enumerate(lambdas))
+    ):
         lmbd = lmbd.reshape(idx * (1,) + (lmbd.shape[0],) + (degree - idx) * (1,))
         tensor *= _safe_inverse(lmbd, threshold)
     return tensor, message
+
 
 """Performs simple update of neighboring tensors under an action of two-sides gate.
 Args:
@@ -288,6 +298,8 @@ Args:
 Returns:
     updated controlling tensor, updated controlled tensor, singular values vector connecting two tensors.
 """
+
+
 def simple_update(
     controlling_tensor: Array,
     controlled_tensor: Array,
@@ -297,7 +309,7 @@ def simple_update(
     controlled_half: Array,
     controlling_index: int,
     controlled_index: int,
-    threshold: Union[Array, float], 
+    threshold: Union[Array, float],
     accuracy: Optional[Union[float, Array]],
     max_rank: Optional[int] = None,
 ) -> Tuple[Array, Array, Array]:
@@ -315,11 +327,21 @@ def simple_update(
         threshold,
         controlled_index,
     )
-    assert (jnp.abs(controlling_lambdas[controlling_index] - controlled_lambdas[controlled_index]) < 1e-5).all()
+    assert (
+        jnp.abs(
+            controlling_lambdas[controlling_index]
+            - controlled_lambdas[controlled_index]
+        )
+        < 1e-5
+    ).all()
     intermediate_lmbd = controlling_lambdas[controlling_index]
     additional_dim = controlling_message.shape[-1] // intermediate_lmbd.shape[0]
-    intermediate_lmbd = jnp.tensordot(intermediate_lmbd, jnp.ones((additional_dim,)), axes=0).reshape((-1,))
-    core = jnp.tensordot(controlling_message * intermediate_lmbd, controlled_message, axes=[1, 1])
+    intermediate_lmbd = jnp.tensordot(
+        intermediate_lmbd, jnp.ones((additional_dim,)), axes=0
+    ).reshape((-1,))
+    core = jnp.tensordot(
+        controlling_message * intermediate_lmbd, controlled_message, axes=[1, 1]
+    )
     u, lmbd, vh = jnp.linalg.svd(core, full_matrices=False)
     rank = _find_rank(lmbd, None, max_rank)
     lmbd = lmbd[:rank]
@@ -334,15 +356,15 @@ def simple_update(
         [
             *range(controlling_index),
             controlling_degree,
-            *range(controlling_index, controlling_degree)
-        ]
+            *range(controlling_index, controlling_degree),
+        ],
     )
     controlled_tensor = jnp.transpose(
         controlled_tensor,
         [
             *range(controlled_index),
             controlled_degree,
-            *range(controlled_index, controlled_degree)
-        ]
+            *range(controlled_index, controlled_degree),
+        ],
     )
     return controlling_tensor, controlled_tensor, lmbd
