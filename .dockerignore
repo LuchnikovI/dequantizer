@@ -1,0 +1,13 @@
+.github
+.mypy_cache
+.pytest_cache
+.gitignore
+.dockerignore
+__pycache__
+venv
+*.egg-info
+*.pdf
+*.prof
+README.md
+./examples
+./ci

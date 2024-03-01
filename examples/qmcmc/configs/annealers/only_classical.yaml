@@ -1,0 +1,3 @@
+- id: "local"
+- id: "uniform"
+  flip_probability: 0.5

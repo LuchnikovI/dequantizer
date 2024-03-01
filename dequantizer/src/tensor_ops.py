@@ -343,7 +343,7 @@ def simple_update(
         controlling_message * intermediate_lmbd, controlled_message, axes=[1, 1]
     )
     u, lmbd, vh = jnp.linalg.svd(core, full_matrices=False)
-    rank = _find_rank(lmbd, None, max_rank)
+    rank = _find_rank(lmbd, accuracy, max_rank)
     lmbd = lmbd[:rank]
     u = u[:, :rank]
     vh = vh[:rank]

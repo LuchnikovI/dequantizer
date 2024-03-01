@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict
 import jax.numpy as jnp
 from jax import Array
 from ..graph.node import Node, NodeID
