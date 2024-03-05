@@ -6,14 +6,16 @@ from ..tensor_ops import canonicalize
 
 """Returns a function that turns Vidal gauge to the symmetric gauge.
 Args:
-    traverser: an iterator traversing elements of the tensor graph.
+    traverser: an iterator traversing elements of the tensor graph;
+    eps: a small value that is used to distinguish between noise
+        and signal.
 Returns:
     a function that takes node tensors and edge core diagonal tensors
     and returns updated node tensors with aggregated edge tensors."""
 
 
 def get_symmetric_gauge_fixing_map(
-    traverser: Iterable[Union[Node, Edge]]
+    traverser: Iterable[Union[Node, Edge]], eps: Union[float, Array]
 ) -> Callable[[Dict[NodeID, Array], Dict[EdgeID, Array]], Dict[NodeID, Array]]:
     def symmetric_gauge(
         tensors: Dict[NodeID, Array], core_edge_tensors: Dict[EdgeID, Array]
@@ -31,7 +33,7 @@ def get_symmetric_gauge_fixing_map(
                         raise NotImplementedError(
                             "This branch is unreachable if the code is correct."
                         )
-                canonicalized_tensors[element.id] = canonicalize(tensor, lambdas)
+                canonicalized_tensors[element.id] = canonicalize(tensor, lambdas, eps)
         return canonicalized_tensors
 
     return symmetric_gauge

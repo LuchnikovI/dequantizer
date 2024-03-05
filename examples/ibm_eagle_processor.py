@@ -86,10 +86,11 @@ def run_eagle_simulation(
     vg_map = jit(get_vidal_gauge_fixing_map(traverser, 1e-10))
 
     # a map that computes the distance to the Vidal gauge
-    vd_map = jit(get_vidal_gauge_distance_map(traverser))
+    # (1e-10 constant is just a small value necessary to distinguish signal from noise)
+    vd_map = jit(get_vidal_gauge_distance_map(traverser, 1e-10))
 
     # a map that fixes symmetric gauge
-    sg_map = jit(get_symmetric_gauge_fixing_map(traverser))
+    sg_map = jit(get_symmetric_gauge_fixing_map(traverser, 1e-10))
 
     """This function performs belief propagation iterations until convergence
     and sets the tensor graph to the Vidal canonical form given the belief propagation

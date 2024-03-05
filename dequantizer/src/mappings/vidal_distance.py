@@ -8,13 +8,15 @@ from ..tensor_ops import vidal_dist
 The function takes the dict of node tensors and the dict of core edge diagonal tensors
 and computes the distance to the Vidal gauge.
 Args:
-    traverser: an iterator that iterates over nodes and edges.
+    traverser: an iterator that iterates over nodes and edges;
+    eps: a small value used to distinguish noise from signal.
 Returns:
     Vidal distance function."""
 
 
 def get_vidal_gauge_distance_map(
-    traverser: Iterable[Union[Node, Edge]]
+    traverser: Iterable[Union[Node, Edge]],
+    eps: Union[float, Array],
 ) -> Callable[[Dict[NodeID, Array], Dict[EdgeID, Array]], Array]:
     def vidal_gauge_distance(
         tensors: Dict[NodeID, Array], core_edge_tensors: Dict[EdgeID, Array]
@@ -32,7 +34,7 @@ def get_vidal_gauge_distance_map(
                         raise NotImplementedError(
                             "This branch is unreachable if the code is correct."
                         )
-                dist += vidal_dist(tensors[element.id], neighboring_core_tensors)
+                dist += vidal_dist(tensors[element.id], neighboring_core_tensors, eps)
             if isinstance(element, Edge):
                 edges_counter += 1
         return dist / (2 * edges_counter)

@@ -11,7 +11,7 @@ from .tensor_graph import (
 )
 from .node import Node, NodeID
 from .edge import Edge, EdgeID
-from .element import MessageID, ElementID
+from .element import MessageID, ElementID, Element
 from .tensor_initializers import (
     get_tensor_random_normal_initializer,
     get_tensor_std_state_initializer,

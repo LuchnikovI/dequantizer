@@ -8,6 +8,7 @@ from .src.graph import (
     EdgeID,
     Node,
     Edge,
+    Element,
     MessageID,
     get_nd_lattice,
     get_random_tree_tensor_graph,
@@ -24,3 +25,5 @@ from .src.mappings import get_vidal_gauge_distance_map
 from .src.mappings import get_symmetric_gauge_fixing_map, lambdas2messages
 from .src.mappings import messages_frob_distance
 from .src.mappings import get_one_side_density_matrix
+
+from .src.quantum_emulator import BPQuantumEmulator

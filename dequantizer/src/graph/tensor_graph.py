@@ -268,7 +268,7 @@ class TensorGraph:
         self, node_id: NodeID, tensors: Dict[NodeID, Array], gate: Array
     ) -> Dict[NodeID, Array]:
         tensor = tensors[node_id]
-        tensor = jnp.tensordot(tensor, gate, axes=[-1, 0])
+        tensor = jnp.tensordot(tensor, gate, axes=[-1, 1])
         tensor /= jnp.linalg.norm(tensor)
         tensors[node_id] = tensor
         return tensors
@@ -441,6 +441,14 @@ class TensorGraph:
             node2.bond_shape == tensors[node2.id].shape[:-1]
         ), f"{node2.bond_shape}, {tensors[node2.id].shape[:-1]}"
         return tensors
+
+    """Sets all bond dimensions to 1."""
+
+    def to_product(self):
+        for node in self.__nodes.values():
+            node.bond_shape = len(node.bond_shape) * (1,)
+        for edge in self.__edges.values():
+            edge.__dimension = 1
 
 
 """Returns a random tree tensor graph whose nodes are labeled by
@@ -1108,7 +1116,7 @@ def ghz_state_preparation_test():
     traverser = list(lattice.get_traversal_iterator() or iter([]))
     bp_map = get_belief_propagation_map(traverser)
     vg_map = get_vidal_gauge_fixing_map(traverser, 1e-8)
-    sg_map = get_symmetric_gauge_fixing_map(traverser)
+    sg_map = get_symmetric_gauge_fixing_map(traverser, 1e-8)
     while dist > 1e-8:
         new_messages = bp_map(tensors, messages)
         dist = messages_frob_distance(new_messages, messages)

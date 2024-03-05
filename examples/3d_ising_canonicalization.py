@@ -106,7 +106,7 @@ def process_ising_sqrt_partition_network(
     # a map that fixes Vidal gauge having converged messages after Belief Propagation
     vg_map = jit(get_vidal_gauge_fixing_map(traverser, jnp.array(accuracy)))
     # a map that computes the distance to the Vidal gauge
-    vd_map = jit(get_vidal_gauge_distance_map(traverser))
+    vd_map = jit(get_vidal_gauge_distance_map(traverser, jnp.array(accuracy)))
     # loop over values of inverse temperature
     for i, beta in enumerate(betas):
         print(f"An iteration #{i} is started, inverse temperature is {beta}.")

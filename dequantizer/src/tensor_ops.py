@@ -1,7 +1,6 @@
 from typing import List, Tuple, Optional, Union
 import jax.numpy as jnp
 from jax import Array
-from jax.lax import round
 
 
 def _find_rank(
@@ -19,6 +18,10 @@ def _find_rank(
 
 def _safe_inverse(lmbd: Array, eps: Union[Array, float]) -> Array:
     return ((lmbd < eps) * jnp.finfo(jnp.float32).max + lmbd) ** -1
+
+
+def _safe_truncate(lmbd: Array, eps: Union[Array, float]) -> Array:
+    return (lmbd > eps) * lmbd
 
 
 """Performs update of messages coming to a node.
@@ -51,7 +54,7 @@ def pass_through_node(tensor: Array, incoming_messages: List[Array]) -> List[Arr
         up_part = up_part.reshape((up_part.shape[0], -1))
         down_part = down_part.reshape((down_part.shape[0], -1))
         updated_message = jnp.tensordot(down_part, up_part, axes=[1, 1])
-        updated_message /= jnp.linalg.norm(updated_message)
+        updated_message /= jnp.trace(updated_message)
         updated_messages.append(updated_message)
     return updated_messages
 
@@ -85,6 +88,7 @@ def absorb_by_node(tensor: Array, matrices: List[Array]) -> Array:
     for matrix in matrices:
         tensor = jnp.tensordot(tensor, matrix, axes=[0, 0])
     tensor = jnp.transpose(tensor, [*range(1, len(tensor.shape)), 0])
+    tensor /= jnp.linalg.norm(tensor)
     return tensor
 
 
@@ -107,27 +111,39 @@ def edge_svd(
         raise NotImplementedError(
             "Edge svd is not yet implemented for edge degrees != 2."
         )
-    uf, lf, _ = jnp.linalg.svd(incoming_messages[0], full_matrices=False)
-    ub, lb, _ = jnp.linalg.svd(incoming_messages[1], full_matrices=False)
+    lf, uf = jnp.linalg.eigh(incoming_messages[0])
+    lb, ub = jnp.linalg.eigh(incoming_messages[1])
     m_sq_inv_f = uf @ (jnp.sqrt(_safe_inverse(lf, eps))[:, jnp.newaxis] * uf.conj().T)
     m_sq_inv_b = ub @ (jnp.sqrt(_safe_inverse(lb, eps))[:, jnp.newaxis] * ub.conj().T)
-    m_sq_f = uf @ (jnp.sqrt(jnp.abs(lf))[:, jnp.newaxis] * uf.conj().T)
-    m_sq_b = ub @ (jnp.sqrt(jnp.abs(lb))[:, jnp.newaxis] * ub.conj().T)
-    u, lmbd, v = jnp.linalg.svd(
+    m_sq_f = uf @ (jnp.sqrt(_safe_truncate(lf, eps))[:, jnp.newaxis] * uf.conj().T)
+    m_sq_b = ub @ (jnp.sqrt(_safe_truncate(lb, eps))[:, jnp.newaxis] * ub.conj().T)
+    u, lmbd, vh = jnp.linalg.svd(
         jnp.tensordot(m_sq_f, m_sq_b, axes=[1, 1]), full_matrices=False
     )
-    return [m_sq_inv_f @ u, m_sq_inv_b @ v.T], lmbd
+    lmbd /= jnp.linalg.norm(lmbd)
+    lmbd = _safe_truncate(lmbd, eps)
+    u *= (lmbd > eps)[jnp.newaxis]
+    u /= jnp.linalg.norm(u)
+    vh *= (lmbd > eps)[:, jnp.newaxis]
+    vh /= jnp.linalg.norm(vh)
+    return [m_sq_inv_f @ u, m_sq_inv_b @ vh.T], lmbd
 
 
 """Computes Vidal distance for a single tensor.
 Args:
     tensor: a tensor;
-    neighboring_core_edge_tensors: neighboring core edge tensors.
+    neighboring_core_edge_tensors: neighboring core edge tensors;
+    eps: a small value that is used to distinguish between noise
+        and signal.  
 Returns:
     A distance."""
 
 
-def vidal_dist(tensor: Array, neighboring_core_edge_tensors: List[Array]) -> Array:
+def vidal_dist(
+    tensor: Array,
+    neighboring_core_edge_tensors: List[Array],
+    eps: Union[float, Array],
+) -> Array:
     degree = len(tensor.shape) - 1
     assert degree == len(neighboring_core_edge_tensors)
     dist = jnp.array(0.0)
@@ -150,20 +166,10 @@ def vidal_dist(tensor: Array, neighboring_core_edge_tensors: List[Array]) -> Arr
         )
         down_part = down_part.reshape((down_part.shape[0], -1))
         result = jnp.tensordot(down_part, up_part, axes=[1, 1])
-        result_trace = jnp.trace(result)
-        result /= result_trace
-        rank = round(1 / jnp.abs(result[0, 0]))
-        ideal = jnp.eye(result.shape[0])
-        mask = (
-            jnp.maximum(
-                jnp.arange(ideal.shape[0])[:, jnp.newaxis],
-                jnp.arange(ideal.shape[0])[jnp.newaxis],
-            )
-            < rank
-        )
-        ideal = ideal * mask
+        result /= jnp.trace(result)
+        ideal = jnp.astype(jnp.diag(jnp.diag(result) > eps), jnp.complex128)
         ideal /= jnp.trace(ideal)
-        _, lmbd, _ = jnp.linalg.svd(ideal - result, full_matrices=False)
+        _, lmbd, _ = jnp.linalg.svd(result - ideal)
         dist += jnp.sum(lmbd)
     return dist
 
@@ -172,21 +178,27 @@ def vidal_dist(tensor: Array, neighboring_core_edge_tensors: List[Array]) -> Arr
 bring the tensor graph to the symmetric canonical form.
 Args:
     tensor: a tensor,
-    lambdas: lambda vectors;
+    lambdas: lambda vectors,
+    eps: a small value that is used to distinguish between noise
+        and signal. 
 Returns:
     canonicalized tensor."""
 
 
-def canonicalize(tensor: Array, lambdas: List[Array]) -> Array:
+def canonicalize(
+    tensor: Array, lambdas: List[Array], eps: Union[float, Array]
+) -> Array:
     degree = len(lambdas)
     assert degree == len(tensor.shape) - 1
     for idx, lmbd in enumerate(lambdas):
         lmbd = lmbd.reshape(idx * (1,) + (lmbd.shape[0],) + (degree - idx) * (1,))
+        lmbd = _safe_truncate(lmbd, eps)
         tensor *= jnp.sqrt(lmbd)
+    tensor /= jnp.linalg.norm(tensor)
     return tensor
 
 
-def _decompose_gate(gate: Array, threshold: Union[Array, float]) -> Tuple[Array, Array]:
+def _decompose_gate(gate: Array, eps: Union[Array, float]) -> Tuple[Array, Array]:
     assert len(gate.shape) == 4
     assert gate.shape[0] == gate.shape[2]
     assert gate.shape[1] == gate.shape[3]
@@ -194,7 +206,7 @@ def _decompose_gate(gate: Array, threshold: Union[Array, float]) -> Tuple[Array,
     dim2 = gate.shape[1]
     gate = jnp.transpose(gate, (0, 2, 1, 3)).reshape((dim1 * dim2, -1))
     u, lmbd, vh = jnp.linalg.svd(gate, full_matrices=False)
-    rank = (lmbd > threshold).sum()
+    rank = (lmbd > eps).sum()
     lmbd_sqrt = jnp.sqrt(lmbd[:rank])
     controlling_half = jnp.transpose(
         (u[:, :rank] * lmbd_sqrt[jnp.newaxis]).reshape((dim1, dim1, rank)), (2, 0, 1)
@@ -253,7 +265,7 @@ def _simple_update_tensor_preprocessing(
     tensor: Array,
     lambdas: List[Array],
     half_gate: Array,
-    threshold: Union[Array, float],
+    eps: Union[Array, float],
     index: int,
 ) -> Tuple[Array, Array]:
     degree = len(lambdas)
@@ -278,7 +290,7 @@ def _simple_update_tensor_preprocessing(
         filter(lambda x: x[0] != index, enumerate(lambdas))
     ):
         lmbd = lmbd.reshape(idx * (1,) + (lmbd.shape[0],) + (degree - idx) * (1,))
-        tensor *= _safe_inverse(lmbd, threshold)
+        tensor *= _safe_inverse(lmbd, eps)
     return tensor, message
 
 
@@ -309,7 +321,7 @@ def simple_update(
     controlled_half: Array,
     controlling_index: int,
     controlled_index: int,
-    threshold: Union[Array, float],
+    eps: Union[Array, float],
     accuracy: Optional[Union[float, Array]],
     max_rank: Optional[int] = None,
 ) -> Tuple[Array, Array, Array]:
@@ -317,14 +329,14 @@ def simple_update(
         controlling_tensor,
         controlling_lambdas,
         controlling_half,
-        threshold,
+        eps,
         controlling_index,
     )
     controlled_tensor, controlled_message = _simple_update_tensor_preprocessing(
         controlled_tensor,
         controlled_lambdas,
         controlled_half,
-        threshold,
+        eps,
         controlled_index,
     )
     assert (
@@ -343,6 +355,7 @@ def simple_update(
         controlling_message * intermediate_lmbd, controlled_message, axes=[1, 1]
     )
     u, lmbd, vh = jnp.linalg.svd(core, full_matrices=False)
+    lmbd = _safe_truncate(lmbd, eps)
     rank = _find_rank(lmbd, accuracy, max_rank)
     lmbd = lmbd[:rank]
     u = u[:, :rank]
