@@ -8,6 +8,7 @@ from ..graph import (
     NodeID,
     EdgeID,
     Node,
+    Edge,
     get_message_random_nonnegative_initializer,
     get_tensor_std_state_initializer,
 )
@@ -96,6 +97,15 @@ class BPQuantumEmulator(QuantumEmulator):
 
     def set_to_product_state(self, state: Dict[NodeID, int]):
         self.tensor_graph.to_product()
+        for element in self.tensor_graph.get_traversal_iterator() or iter([]):
+            if isinstance(element, Node):
+                assert element.bond_shape == (1,) * len(element.bond_shape)
+            elif isinstance(element, Edge):
+                assert element.dimension == 1
+            else:
+                raise NotImplementedError(
+                    "This is an unreachable point if the code is correct"
+                )
 
         def _initializer(node: Node) -> Array:
             s = state[node.id]
@@ -126,7 +136,7 @@ class BPQuantumEmulator(QuantumEmulator):
         controlled_node_id: NodeID,
     ):
         if self.__lambdas is None:
-            raise ValueError("Lambdas are not defined, more likely it is bug.")
+            raise ValueError("Lambdas are not defined, more likely it is a bug.")
         if self.__gates_num_passed_after_regauging >= self.__gates_number_per_regauging:
             self._vidal_regauging()
             self.__gates_num_passed_after_regauging = 0
@@ -228,13 +238,13 @@ class BPQuantumEmulator(QuantumEmulator):
                 )
                 break
             messages = self.__bp_map(self.__tensors, messages)
-            tensors, lambdas = self.__vg_map(self.__tensors, messages)
-            vidal_dist = self.__vd_map(tensors, lambdas)
+            canonical_tensors, lambdas = self.__vg_map(self.__tensors, messages)
+            vidal_dist = self.__vd_map(canonical_tensors, lambdas)
             log.info(f"Vidal distance: {vidal_dist}")
             iters += 1
         log.info("State is set to the Vidal canonical form")
         self.__lambdas = lambdas
-        self.__tensors = tensors
+        self.__tensors = canonical_tensors
 
     def _vidal_regauging(self):
         log.info("Vidal regauging started")
@@ -242,7 +252,9 @@ class BPQuantumEmulator(QuantumEmulator):
             raise ValueError("Lambdas are not defined, more likely it is bug.")
         tensors = self.__sg_map(self.__tensors, self.__lambdas)
         messages = self.__lambdas2messages(self.__lambdas)
-        vidal_dist = jnp.finfo(jnp.float64).max
+        canonical_tensors, lambdas = self.__vg_map(tensors, messages)
+        vidal_dist = self.__vd_map(canonical_tensors, lambdas)
+        log.info(f"Vidal distance: {vidal_dist}")
         iters = 0
         while vidal_dist > self.__belief_propagation_accuracy:
             if (
@@ -254,10 +266,10 @@ class BPQuantumEmulator(QuantumEmulator):
                 )
                 break
             messages = self.__bp_map(tensors, messages)
-            tensors, lambdas = self.__vg_map(tensors, messages)
-            vidal_dist = self.__vd_map(tensors, lambdas)
+            canonical_tensors, lambdas = self.__vg_map(tensors, messages)
+            vidal_dist = self.__vd_map(canonical_tensors, lambdas)
             log.info(f"Vidal distance: {vidal_dist}")
             iters += 1
         log.info("Regauging finished")
         self.__lambdas = lambdas
-        self.__tensors = tensors
+        self.__tensors = canonical_tensors

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-"""In this example we simulate dynamics of 62-nd qubit (middle one) in Eagle
-IBM quantum processor either for 127 qubits (the original IBM processor) 
-or for its infinite modification.
+"""In this example we simulate dynamics of 62-nd qubit (a qubit in the middle
+of a lattice) of the Eagle IBM quantum processor either for 127 qubits
+(the original IBM processor) or for its infinite modification.
 
 Note, that simulation for an infinite processor is way faster due to 
 the translational symmetry."""
@@ -10,33 +10,30 @@ the translational symmetry."""
 import os
 
 os.environ["JAX_ENABLE_X64"] = "True"
+
 import jax
 
 jax.config.update("jax_platform_name", "cpu")
+
 import matplotlib
 
 matplotlib.rcParams["font.family"] = "monospace"
-from typing import Union, Dict, Tuple, List
+
+import logging
+from typing import Union, List, Optional
 import matplotlib.pyplot as plt
 import jax.numpy as jnp
-from jax import jit, Array
-from jax.random import PRNGKey, split
+from jax import Array
+from jax.random import PRNGKey
 from dequantizer import (
-    get_heavy_hex_ibm_eagle_lattice_infinite,
+    BPQuantumEmulator,
     get_heavy_hex_ibm_eagle_lattice,
-    get_belief_propagation_map,
-    get_vidal_gauge_fixing_map,
-    get_vidal_gauge_distance_map,
-    get_symmetric_gauge_fixing_map,
-    get_message_random_nonnegative_initializer,
-    get_tensor_std_state_initializer,
-    get_one_side_density_matrix,
-    lambdas2messages,
-    Node,
+    get_heavy_hex_ibm_eagle_lattice_infinite,
     Edge,
-    NodeID,
-    EdgeID,
 )
+
+log = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 """This function runs dynamics simulation for either 127 qubits or
 infinite IBM Eagle processor (see https://arxiv.org/abs/2306.14887).
@@ -48,6 +45,7 @@ Args:
     theta: an angle parameter in X rotation gate;
     is_infinite: a flag specifying the type of the model (127 qubits or infinite);
     synchronous_update: a flag specifying the schedule (synchronous or sequential);
+    max_belief_propagation_iterations: a maximal allowed number of belief propagation iterations;
     key: jax random seed;
     traversal_type: the type of traversal (either 'dfs' standing for depth first search
         or 'bfs' standing for breadth first search).
@@ -63,6 +61,7 @@ def run_eagle_simulation(
     theta: float,
     is_infinite: bool = True,
     synchronous_update: bool = False,
+    max_belief_propagation_iterations: Optional[int] = None,
     key: Array = PRNGKey(42),
     traversal_type: str = "dfs",
 ) -> List[Array]:
@@ -73,83 +72,26 @@ def run_eagle_simulation(
     else:
         eagle_lattice = get_heavy_hex_ibm_eagle_lattice()
 
-    # defining the tensor graph traverser
-    traverser = list(
-        eagle_lattice.get_traversal_iterator(ordering=traversal_type) or iter([])
+    # an iterator that traverses nodes and edges of a tensor graph
+    traverser = list(eagle_lattice.get_traversal_iterator() or iter([]))
+
+    # a target qubit id whose dynamics is necessary to compute
+    if is_infinite:
+        target_qubit_id = 2
+    else:
+        target_qubit_id = 62
+
+    # an instance of belief propagation based quantum emulator
+    quantum_emulator = BPQuantumEmulator(
+        eagle_lattice,
+        key,
+        max_chi,
+        eagle_lattice.edges_number * layers_per_regauging,
+        accuracy,
+        max_belief_propagation_iterations,
+        synchronous_update,
+        traversal_type,
     )
-    # a map that performs a single belief propagation iteration
-    bp_map = jit(get_belief_propagation_map(traverser, synchronous_update))
-
-    # a map that fixes the Vidal gauge given the belief propagation is converged
-    # (1e-10 constant is just a small value necessary for regularization of
-    # some inversions)
-    vg_map = jit(get_vidal_gauge_fixing_map(traverser, 1e-10))
-
-    # a map that computes the distance to the Vidal gauge
-    # (1e-10 constant is just a small value necessary to distinguish signal from noise)
-    vd_map = jit(get_vidal_gauge_distance_map(traverser, 1e-10))
-
-    # a map that fixes symmetric gauge
-    sg_map = jit(get_symmetric_gauge_fixing_map(traverser, 1e-10))
-
-    """This function performs belief propagation iterations until convergence
-    and sets the tensor graph to the Vidal canonical form given the belief propagation
-    is converged.
-    Args:
-        tensors: tensors forming a tensor graph;
-        key: jax random seed.
-    Returns:
-        fixed gauge tensors and diagonal matrices sitting on edges (singular values)."""
-
-    def set_to_vidal_gauge(
-        tensors: Dict[NodeID, Array],
-        key: Array,
-    ) -> Tuple[Dict[NodeID, Array], Dict[EdgeID, Array]]:
-        print("""Setting a tensor graph to the Vidal gauge...""")
-        message_initializer = get_message_random_nonnegative_initializer(key)
-        messages = eagle_lattice.init_messages(message_initializer)
-        vidal_dist = jnp.finfo(jnp.float64).max
-        while vidal_dist > accuracy:
-            messages = bp_map(tensors, messages)
-            canonical_tensors, lmbds = vg_map(tensors, messages)
-            vidal_dist = vd_map(canonical_tensors, lmbds)
-            print(f"\tVidal distance: {vidal_dist}")
-        print("""Vidal gauge is set.""")
-        return canonical_tensors, lmbds
-
-    """This function performs regauging of the tensor graph and compute
-    the value of the target observable (<Z> of the 62-nd qubit)
-    by running belief propagation.
-    Args:
-        tensors: fixed gauge tensors that need to be corrected;
-        lambdas: diagonal matrices sitting on edges (singular values)
-            that need to be corrected.
-    Returns:
-        corrected (regauged) fixed gauge tensors and diagonal matrices
-        sitting on edges."""
-
-    def vidal_regauging_and_computing_observables(
-        tensors: Dict[NodeID, Array],
-        lambdas: Dict[EdgeID, Array],
-    ) -> Tuple[Tuple[Dict[NodeID, Array], Dict[EdgeID, Array]], Array]:
-        print("Running regauging and observable evaluation...")
-        tensors = sg_map(tensors, lambdas)
-        messages = lambdas2messages(lambdas)
-        vidal_dist = jnp.finfo(jnp.float64).max
-        while vidal_dist > accuracy:
-            messages = bp_map(tensors, messages)
-            canonical_tensors, lmbds = vg_map(tensors, messages)
-            vidal_dist = vd_map(canonical_tensors, lmbds)
-            print(f"\tVidal distance: {vidal_dist}")
-        print("Regauging finished.")
-        if is_infinite:
-            target_node = eagle_lattice.get_node(2)
-        else:
-            target_node = eagle_lattice.get_node(62)
-        assert target_node is not None  # node must be present in a graph
-        dens = get_one_side_density_matrix(target_node, tensors, messages)
-        print("Observable is computed.")
-        return (canonical_tensors, lmbds), (dens[0, 0] - dens[1, 1]).real
 
     # interaction gate
     interaction_gate = jnp.diag(
@@ -175,46 +117,31 @@ def run_eagle_simulation(
         ]
     ).reshape((2, 2))
 
-    # tensors initialization
-    tensors = eagle_lattice.init_tensors(get_tensor_std_state_initializer())
-
-    # setting tensor graph to the Vidal gauge
-    key, subkey = split(key)
-    tensors, lambdas = set_to_vidal_gauge(tensors, subkey)
-
     # simulation loop
     target_qubit_dynamics = []
-    for layer_number in range(trotter_steps):
-
-        # periodic regauging each `layers_per_regauging` layers
-        if layer_number % layers_per_regauging == 0:
-            (tensors, lambdas), z62 = vidal_regauging_and_computing_observables(
-                tensors, lambdas
-            )
-            target_qubit_dynamics.append(z62)
-
-        print(f"Running layer number {layer_number}...")
-
-        # X rotation gate application
-        for element in traverser:
-            if isinstance(element, Node):
-                tensors = eagle_lattice.apply1(element.id, tensors, mixing_gate)
-
-        # Interaction gate application
+    dens = quantum_emulator.dens_q1(target_qubit_id)
+    log.info(f"Target qubit density matrix at layer 0: {dens}")
+    target_qubit_dynamics.append((dens[0, 0] - dens[1, 1]).real)
+    for layer_number in range(1, trotter_steps + 1):
+        log.info(f"Layer number {layer_number} is running")
+        # layer of mixing gates
+        for node_id in range(eagle_lattice.nodes_number):
+            quantum_emulator.apply_q1(mixing_gate, node_id)
+        # layer of interaction gates
         for element in traverser:
             if isinstance(element, Edge):
                 element_id = element.id
                 assert isinstance(element_id, tuple)
-                tensors, lambdas = eagle_lattice.apply2_to_vidal_canonical(
+                quantum_emulator.apply_q2(
+                    interaction_gate,
                     element_id[0],
                     element_id[1],
-                    tensors,
-                    lambdas,
-                    interaction_gate,
-                    1e-10,  # this is a small constant to regularize some inversions
-                    None,
-                    max_chi,
                 )
+        # target qubit density matrix
+        dens = quantum_emulator.dens_q1(target_qubit_id)
+        log.info(f"Target qubit density matrix at layer {layer_number}: {dens}")
+        log.info(f"Layer number {layer_number} is finished")
+        target_qubit_dynamics.append((dens[0, 0] - dens[1, 1]).real)
     return target_qubit_dynamics
 
 
@@ -229,6 +156,7 @@ def main():
     layers_per_regauging = 1
     trotter_steps = 20
     accuracy = 1e-5
+    max_belief_propagation_iterations = None
     is_infinite = True
 
     # simulation
@@ -239,6 +167,7 @@ def main():
         accuracy,
         theta,
         is_infinite=is_infinite,
+        max_belief_propagation_iterations=max_belief_propagation_iterations,
     )
 
     # plotting

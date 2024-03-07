@@ -447,8 +447,10 @@ class TensorGraph:
     def to_product(self):
         for node in self.__nodes.values():
             node.bond_shape = len(node.bond_shape) * (1,)
+            assert self.get_node(node.id).bond_shape == len(node.bond_shape) * (1,)
         for edge in self.__edges.values():
-            edge.__dimension = 1
+            edge.dimension = 1
+            assert self.get_edge(edge.id).dimension == 1
 
 
 """Returns a random tree tensor graph whose nodes are labeled by
