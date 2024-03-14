@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 
+import os
+
+os.environ["JAX_ENABLE_X64"] = "True"
+os.environ["XLA_FLAGS"] = "--xla_backend_optimization_level=0"
+
 import logging
 import jax.numpy as jnp
 import h5py  # type: ignore
@@ -7,10 +12,16 @@ import hydra
 from omegaconf import DictConfig
 from hydra.core.hydra_config import HydraConfig
 from jax.random import PRNGKey, split
-from qmcmc.src.energy_function import random_on_ibm_heavy_hex, EnergyFunction
+from qmcmc.src.energy_function import (
+    random_on_ibm_heavy_hex,
+    random_on_one_heavy_hex_loop,
+    random_on_small_tree,
+    EnergyFunction,
+)
 from qmcmc.src.base_annealer import Annealer as BaseAnnealer
 from qmcmc.src.local_annealer import LocalAnnealer
 from qmcmc.src.uniform_annealer import UniformAnnealer
+from qmcmc.src.quantum_annealer import QuantumAnnealer
 
 log = logging.getLogger(__name__)
 
@@ -46,6 +57,8 @@ def main(cfg: DictConfig):
     log.info(f"Standard deviation of coupling constants is set to {coupling_std}")
     log.info(f"Random seed is set to {seed}")
 
+    key, run_subkey = split(key)
+
     # lattice generation
     energy_function: EnergyFunction
     match lattice_type:
@@ -53,6 +66,16 @@ def main(cfg: DictConfig):
         case "ibm_heavy_hex":
             key, subkey = split(key)
             energy_function = random_on_ibm_heavy_hex(subkey, field_std, coupling_std)
+
+        case "one_heavy_hex_loop":
+            key, subkey = split(key)
+            energy_function = random_on_one_heavy_hex_loop(
+                subkey, field_std, coupling_std
+            )
+
+        case "small_tree":
+            key, subkey = split(key)
+            energy_function = random_on_small_tree(subkey, field_std, coupling_std)
 
         case other:
             raise NotImplementedError(f"Lattice of type {other} is not implemented.")
@@ -77,8 +100,22 @@ def main(cfg: DictConfig):
                 )
 
             case "quantum":
-                log.info("Starting QUANTUM annealer")
-                raise NotImplementedError()
+                log.info(f"Starting QUANTUM annealer, parameters: {annealer_params}")
+                key, subkey = split(key)
+                annealer = QuantumAnnealer(
+                    energy_function,
+                    float(annealer_params["gamma"]),
+                    int(annealer_params["max_chi"]),
+                    int(annealer_params["layers_per_regauging"]),
+                    int(annealer_params["max_belief_propagation_iterations"]),
+                    list(
+                        map(lambda x: float(x), annealer_params["time_step_per_layer"])
+                    ),
+                    subkey,
+                    float(annealer_params["accuracy"]),
+                    bool(annealer_params["synchronous_update"]),
+                    annealer_params["traversal_type"],
+                )
 
             case other:
                 raise NotImplementedError(
@@ -86,13 +123,12 @@ def main(cfg: DictConfig):
                 )
 
         # running annealing
-        key, subkey = split(key)
         result = annealer.run(
             initial_temperature,
             final_temperature,
             temperature_schedule,
             lambda _, energy: log.info(f"Energy value: {energy}"),
-            subkey,
+            run_subkey,
         )
         hdf5_file = h5py.File(
             f"{output_dir}/{annealer_params['id']}_annealer_result", "a"

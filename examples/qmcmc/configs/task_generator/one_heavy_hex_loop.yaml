@@ -1,0 +1,4 @@
+lattice_type: "one_heavy_hex_loop"
+fields_std: 1.
+couplings_std: 1.
+seed: 42

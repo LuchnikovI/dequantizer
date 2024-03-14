@@ -1,0 +1,12 @@
+- id: "local"
+- id: "uniform"
+  flip_probability: 0.5
+- id: "quantum"
+  max_chi: 64
+  max_belief_propagation_iterations: 30
+  layers_per_regauging: 1
+  gamma: 0.5
+  time_step_per_layer: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+  accuracy: 1e-8
+  synchronous_update: False
+  traversal_type: "dfs"

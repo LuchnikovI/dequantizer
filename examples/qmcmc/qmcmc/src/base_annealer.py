@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from typing import Union, Callable, Optional, List
 from abc import ABC, abstractmethod
@@ -47,6 +48,8 @@ class AnnealingResults:
             "acceptance_vs_iteration", data=jnp.array(self.acceptance_vs_iteration)
         )
 
+
+log = logging.getLogger(__name__)
 
 """A base class for annealers."""
 
@@ -137,6 +140,7 @@ class Annealer(ABC):
                 self.__coupled_spin_pairs,
                 self.__fields,
             )
+            log.info(f"New proposal energy: {new_energy}")
             transition_probabilities_ratio = self._transition_probabilities_ratio(
                 config, new_config
             )

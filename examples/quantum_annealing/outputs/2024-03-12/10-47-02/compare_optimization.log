@@ -1,0 +1,11 @@
+[2024-03-12 10:47:02,461][jax._src.xla_bridge][INFO] - Unable to initialize backend 'cuda': 
+[2024-03-12 10:47:02,461][jax._src.xla_bridge][INFO] - Unable to initialize backend 'rocm': module 'jaxlib.xla_extension' has no attribute 'GpuAllocatorConfig'
+[2024-03-12 10:47:02,463][jax._src.xla_bridge][INFO] - Unable to initialize backend 'tpu': INTERNAL: Failed to open libtpu.so: libtpu.so: cannot open shared object file: No such file or directory
+[2024-03-12 10:47:02,594][__main__][INFO] - Output directory is outputs/2024-03-12/10-47-02
+[2024-03-12 10:47:02,594][__main__][INFO] - Total time step size 0.5
+[2024-03-12 10:47:02,594][__main__][INFO] - Time steps number 10
+[2024-03-12 10:47:02,594][__main__][INFO] - Time steps schedule is se by a closure lambda t: 1 - t
+[2024-03-12 10:47:02,594][__main__][INFO] - Lattice type is set to small_tree
+[2024-03-12 10:47:02,594][__main__][INFO] - Standard deviation of local magnetic fields is set to 1.0
+[2024-03-12 10:47:02,594][__main__][INFO] - Standard deviation of coupling constants is set to 1.0
+[2024-03-12 10:47:02,594][__main__][INFO] - Random seed is set to 42

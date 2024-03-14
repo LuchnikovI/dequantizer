@@ -1,0 +1,4 @@
+lattice_type: "ibm_heavy_hex"
+fields_std: 1.
+couplings_std: 1.
+seed: 42

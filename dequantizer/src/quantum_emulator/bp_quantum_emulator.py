@@ -1,4 +1,4 @@
-from typing import Union, Dict, Optional
+from typing import Union, Dict, Optional, List
 import logging
 import jax.numpy as jnp
 from jax import Array, jit
@@ -89,7 +89,17 @@ class BPQuantumEmulator(QuantumEmulator):
             get_tensor_std_state_initializer()
         )
         self.__lambdas: Optional[Dict[EdgeID, Array]] = None
+        self.__vidal_distances_after_regauging: List[Array] = []
+        self.__truncation_affected_vidal_distances: List[Array] = []
         self._set_to_vidal_canonical()
+
+    @property
+    def after_regauging_vidal_distances(self) -> Array:
+        return jnp.array(self.__vidal_distances_after_regauging)
+
+    @property
+    def truncated_affected_vidal_distances(self) -> Array:
+        return jnp.array(self.__truncation_affected_vidal_distances)
 
     """Sets emulator state to a product state.
     Args:
@@ -242,6 +252,7 @@ class BPQuantumEmulator(QuantumEmulator):
             vidal_dist = self.__vd_map(canonical_tensors, lambdas)
             log.info(f"Vidal distance: {vidal_dist}")
             iters += 1
+        self.__vidal_distances_after_regauging.append(vidal_dist)
         log.info("State is set to the Vidal canonical form")
         self.__lambdas = lambdas
         self.__tensors = canonical_tensors
@@ -255,6 +266,7 @@ class BPQuantumEmulator(QuantumEmulator):
         canonical_tensors, lambdas = self.__vg_map(tensors, messages)
         vidal_dist = self.__vd_map(canonical_tensors, lambdas)
         log.info(f"Vidal distance: {vidal_dist}")
+        self.__truncation_affected_vidal_distances.append(vidal_dist)
         iters = 0
         while vidal_dist > self.__belief_propagation_accuracy:
             if (
@@ -270,6 +282,7 @@ class BPQuantumEmulator(QuantumEmulator):
             vidal_dist = self.__vd_map(canonical_tensors, lambdas)
             log.info(f"Vidal distance: {vidal_dist}")
             iters += 1
+        self.__vidal_distances_after_regauging.append(vidal_dist)
         log.info("Regauging finished")
         self.__lambdas = lambdas
         self.__tensors = canonical_tensors

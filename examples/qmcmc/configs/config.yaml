@@ -1,4 +1,4 @@
 defaults:
   - temperature_vs_iter: standard_exponential
-  - task_generator: standard_ibm_heavy_hex
-  - annealers: only_classical
+  - task_generator: small_tree
+  - annealers: small_bond_exact
