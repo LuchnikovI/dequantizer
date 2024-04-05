@@ -10,7 +10,7 @@ transparent.
 Usage: . ${BASH_SOURCE[0]} [OPTIONS] [HYDRA_OPTIONS]
 
 Options:
-    --help: shows this message and ignores the command;
+    --help: shows this message;
 
 EOF
 }
