@@ -5,3 +5,4 @@ venv
 *.egg-info
 *.pdf
 *.prof
+/examples/quantum_annealing/outputs
