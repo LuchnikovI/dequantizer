@@ -21,6 +21,9 @@ os.environ["XLA_FLAGS"] = (
     "--xla_backend_optimization_level=0 --xla_llvm_disable_expensive_passes=true"
 )
 
+import jax
+jax.config.update("jax_platform_name", "cpu")
+
 from dataclasses import dataclass
 from typing import Union, Dict, List
 import matplotlib.pyplot as plt
