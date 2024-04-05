@@ -1,4 +1,0 @@
-initial_temperature: 8.
-final_temperature: 0.3
-steps_number: 10000
-flip_probability: 0.5

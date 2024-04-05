@@ -1,5 +1,4 @@
 defaults:
-  - quantum_annealing_schedule: small_smooth
-  - classical_annealer_schedule: standard
+  - quantum_annealing_schedule: linear
   - task_generator: standard_ibm_heavy_hex
   - emulator_parameters: small_bond

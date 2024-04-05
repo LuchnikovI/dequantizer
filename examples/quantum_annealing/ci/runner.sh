@@ -2,17 +2,15 @@
 
 get_help() {
 cat << EOF
-Runs scripts within the container with all preinstalled dependancies. \
+Runs quantum annealing experiment within the container with all preinstalled dependancies. \
 If image of the container does not exist, it builds it first. \
-It mounts the entire home directory to make the access to files on the machine \
+It mounts the entire home directory inside the container to make the access to files on the machine \
 transparent.
 
-Usage: . ${BASH_SOURCE[0]} [OPTION] SCRIPT
+Usage: . ${BASH_SOURCE[0]} [OPTIONS] [HYDRA_OPTIONS]
 
 Options:
     --help: shows this message and ignores the command;
-Scripts:
-    compare_optimization: a script that runs annealers convergence comparison (see root of qmcmc example)
 
 EOF
 }
@@ -29,6 +27,7 @@ else
 fi
 
 docker_run="docker run \
+    --user $QA_UID:$QA_GID
     --workdir "${script_dir}/.." \
     --mount type=bind,source="${HOME}",target="${HOME}" \
     $cuda_flag \
@@ -40,13 +39,7 @@ case $1 in
         get_help
         exit 0
     ;;
-  compare_optimization)
-        shift
-        ${docker_run} "${script_dir}/../compare_optimization.py" $@
-    ;;
   *)
-        echo "Unknown command: '$1'"
-        get_help
-        exit 1
+        ${docker_run} "${script_dir}/../run_quantum_annealing.py" $@
     ;;
 esac

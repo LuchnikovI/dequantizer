@@ -20,6 +20,9 @@ else
     export QA_IMAGE_NAME="quantum_annealing.cpu"
 fi
 
+export QA_UID=$(id -u)
+export QA_GID=$(id -g)
+
 # -------------------------------------------------------------------------------------------
 
 log() {

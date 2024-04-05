@@ -20,7 +20,6 @@ from quantum_annealing.src.energy_function import (
 )
 from quantum_annealing.src.scheduler import get_scheduler
 from quantum_annealing.src.quantum_annealer import run_quantum_annealer
-from quantum_annealing.src.classical_annealer import run_classical_annealer
 from quantum_annealing.src.energy_evaluation import eval_energy
 
 log = logging.getLogger(__name__)
@@ -28,10 +27,11 @@ log = logging.getLogger(__name__)
 
 @hydra.main(version_base=None, config_path="./configs", config_name="config")
 def main(cfg: DictConfig):
+    # extracting experiment parameters
+    seed = int(cfg["task_generator"]["seed"])
     lattice_type = cfg["task_generator"]["lattice_type"]
     field_std = jnp.array(float(cfg["task_generator"]["fields_std"]))
     coupling_std = jnp.array(float(cfg["task_generator"]["couplings_std"]))
-    seed = int(cfg["task_generator"]["seed"])
     total_time_step_size = float(
         cfg["quantum_annealing_schedule"]["total_time_step_size"]
     )
@@ -45,16 +45,11 @@ def main(cfg: DictConfig):
     accuracy = float(cfg["emulator_parameters"]["accuracy"])
     synchronous_update = bool(cfg["emulator_parameters"]["synchronous_update"])
     traversal_type = cfg["emulator_parameters"]["traversal_type"]
-    initial_temperature = cfg["classical_annealer_schedule"]["initial_temperature"]
-    final_temperature = cfg["classical_annealer_schedule"]["final_temperature"]
-    flip_probability = cfg["classical_annealer_schedule"]["flip_probability"]
-    classical_steps_number = cfg["classical_annealer_schedule"]["steps_number"]
-
     key = PRNGKey(seed)
     key, subkey = split(key)
     output_dir = HydraConfig.get().run.dir
 
-    # logging
+    # logging some experiment parameters
     log.info(f"Output directory is {output_dir}")
     log.info(f"Total time step size {total_time_step_size}")
     log.info(f"Quantum annealer steps number {quantum_steps_number}")
@@ -73,14 +68,6 @@ def main(cfg: DictConfig):
     log.info(f"Accuracy of belief propagation is set to {accuracy}")
     log.info(f"Synchronous updates are turned to {synchronous_update}")
     log.info(f"Type of graph traversal is set to {traversal_type}")
-    log.info(
-        f"Initial temperature of a classical annealer is set to {initial_temperature}"
-    )
-    log.info(f"Final temperature of a classical annealer is set to {final_temperature}")
-    log.info(f"Classical annealer number of steps is set to {classical_steps_number}")
-    log.info(
-        f"Spin flip probability of a classical annealer is set to {flip_probability}"
-    )
 
     # lattice generation
     energy_function: EnergyFunction
@@ -104,16 +91,9 @@ def main(cfg: DictConfig):
             raise NotImplementedError(f"Lattice of type {other} is not implemented.")
     qubits_number = len(energy_function.fields)
     log.info(f"Number of qubits in a lattice is {qubits_number}")
+    # quantum annealing schedule
     schedule = get_scheduler(total_time_step_size, schedule, quantum_steps_number)
-    key, subkey = split(key)
-    classical_annealing_results = run_classical_annealer(
-        initial_temperature,
-        final_temperature,
-        classical_steps_number,
-        flip_probability,
-        energy_function,
-        subkey,
-    )
+    # running quantum annealing
     log.info(f"Quantum annealing is started")
     key, subkey = split(key)
     quantum_annealing_results = run_quantum_annealer(
@@ -134,18 +114,21 @@ def main(cfg: DictConfig):
         energy_function, quantum_annealing_results.configuration
     )
     log.info(f"Sampled energy: {quantum_sampled_energy}")
+    # saving experiment results
     hdf5_file = h5py.File(f"{output_dir}/result", "a")
+    hdf5_file.create_dataset(
+        "coupling_amplitudes", data=energy_function.coupling_amplitudes
+    )
+    hdf5_file.create_dataset(
+        "coupled_spin_pairs", data=energy_function.coupled_spin_pairs
+    )
+    hdf5_file.create_dataset(
+        "fields", data=energy_function.fields
+    )
     hdf5_file.create_dataset(
         "quantum_annealer_configuration", data=quantum_annealing_results.configuration
     )
     hdf5_file.create_dataset("quantum_annealer_energy", data=quantum_sampled_energy)
-    hdf5_file.create_dataset(
-        "classical_annealer_configuration",
-        data=classical_annealing_results.configuration,
-    )
-    hdf5_file.create_dataset(
-        "classical_annealer_energy", data=classical_annealing_results.energy
-    )
     hdf5_file.create_dataset(
         "vidal_distances_after_regauging",
         data=quantum_annealing_results.vidal_distances_after_regauging,
