@@ -21,9 +21,12 @@ flipped_hadamard = 0.5 * jnp.array(
 
 @dataclass
 class QuantumAnnealingResults:
-    configuration: Array
+    configuration: Union[Array, None]
+    density_matrices: Array
     vidal_distances_after_regauging: Array
     truncation_affected_vidal_distances: Array
+    truncation_errors: Array
+    entropies: Array
 
 
 def _tensor_graph_init(energy_function: EnergyFunction) -> TensorGraph:
@@ -92,6 +95,7 @@ def run_quantum_annealer(
     max_belief_propagation_iteration: int,
     synchronous_update: bool,
     traversal_type: str,
+    sample_measurements: bool,
 ) -> QuantumAnnealingResults:
     tensor_graph = _tensor_graph_init(energy_function)
     emulator = BPQuantumEmulator(
@@ -116,12 +120,22 @@ def run_quantum_annealer(
             emulator.apply_q2(coupling_gate, node_id1, node_id2)
         for node_id, mixing_gate in enumerate(mixing_gates):
             emulator.apply_q1(mixing_gate, node_id)
-    measurement_results = []
+    density_matrices = []
     for node_id in range(tensor_graph.nodes_number):
-        measurement_results.append(emulator.measure(node_id))
-    config = 1 - 2 * jnp.array(measurement_results)
+        density_matrices.append(emulator.dens_q1(node_id))
+    density_matrices = jnp.array(density_matrices)
+    measurement_results = []
+    if sample_measurements:
+        for node_id in range(tensor_graph.nodes_number):
+            measurement_results.append(emulator.measure(node_id))
+        config = 1 - 2 * jnp.array(measurement_results)
+    else:
+        config = None
     return QuantumAnnealingResults(
         config,
+        density_matrices,
         emulator.after_regauging_vidal_distances,
         emulator.truncated_affected_vidal_distances,
+        jnp.array(emulator.truncation_errors),
+        jnp.array(emulator.entropies),
     )

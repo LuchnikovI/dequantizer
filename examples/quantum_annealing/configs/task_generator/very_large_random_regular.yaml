@@ -1,0 +1,6 @@
+lattice_type: "random_regular"
+fields_std: 1.
+couplings_std: 1.
+seed: 42
+nodes_number: 1000
+degree: 3

@@ -1,0 +1,6 @@
+lattice_type: "random_regular_maxcut"
+fields_std: 1.
+couplings_std: 1.
+seed: 42
+nodes_number: 150
+degree: 3

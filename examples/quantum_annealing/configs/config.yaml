@@ -1,4 +1,5 @@
 defaults:
-  - quantum_annealing_schedule: linear
-  - task_generator: standard_ibm_heavy_hex
-  - emulator_parameters: small_bond
+  - quantum_annealing_schedule: linear_wo_sampling
+  - task_generator: medium_random_regular
+  - simcim_parameters: std
+  - emulator_parameters: std

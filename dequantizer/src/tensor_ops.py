@@ -1,6 +1,7 @@
 from typing import List, Tuple, Optional, Union
 import jax.numpy as jnp
 from jax import Array
+from jax.scipy.special import entr
 
 
 def _find_rank(
@@ -308,7 +309,9 @@ Args:
     accuracy: the maximal truncation error, not considered if None;
     max_rank: the maximal allowed edge dimension, not considered if None.
 Returns:
-    updated controlling tensor, updated controlled tensor, singular values vector connecting two tensors.
+    updated controlling tensor, updated controlled tensor, singular values vector connecting two tensors,
+    truncation error (normalized sqrt of sum of squares of truncated singular values),
+    entropy of lambdas sitting on the edge.
 """
 
 
@@ -324,7 +327,7 @@ def simple_update(
     eps: Union[Array, float],
     accuracy: Optional[Union[float, Array]],
     max_rank: Optional[int] = None,
-) -> Tuple[Array, Array, Array]:
+) -> Tuple[Array, Array, Array, Array, Array]:
     controlling_tensor, controlling_message = _simple_update_tensor_preprocessing(
         controlling_tensor,
         controlling_lambdas,
@@ -357,6 +360,9 @@ def simple_update(
     u, lmbd, vh = jnp.linalg.svd(core, full_matrices=False)
     lmbd = _safe_truncate(lmbd, eps)
     rank = _find_rank(lmbd, accuracy, max_rank)
+    normalized_lmbd = lmbd / jnp.linalg.norm(lmbd)
+    entropy = entr(normalized_lmbd**2).sum()
+    err = jnp.linalg.norm(normalized_lmbd[rank:])
     lmbd = lmbd[:rank]
     u = u[:, :rank]
     vh = vh[:rank]
@@ -380,4 +386,4 @@ def simple_update(
             *range(controlled_index, controlled_degree),
         ],
     )
-    return controlling_tensor, controlled_tensor, lmbd
+    return controlling_tensor, controlled_tensor, lmbd, err, entropy

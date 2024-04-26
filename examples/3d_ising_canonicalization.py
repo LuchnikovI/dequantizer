@@ -22,6 +22,7 @@ os.environ["XLA_FLAGS"] = (
 )
 
 import jax
+
 jax.config.update("jax_platform_name", "cpu")
 
 from dataclasses import dataclass

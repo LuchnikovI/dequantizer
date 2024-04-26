@@ -91,6 +91,8 @@ class BPQuantumEmulator(QuantumEmulator):
         self.__lambdas: Optional[Dict[EdgeID, Array]] = None
         self.__vidal_distances_after_regauging: List[Array] = []
         self.__truncation_affected_vidal_distances: List[Array] = []
+        self.__truncation_errors = []
+        self.__entropies = []
         self._set_to_vidal_canonical()
 
     @property
@@ -150,7 +152,7 @@ class BPQuantumEmulator(QuantumEmulator):
         if self.__gates_num_passed_after_regauging >= self.__gates_number_per_regauging:
             self._vidal_regauging()
             self.__gates_num_passed_after_regauging = 0
-        self.tensor_graph.apply2_to_vidal_canonical(
+        _, _, err, entropy = self.tensor_graph.apply2_to_vidal_canonical(
             controlling_node_id,
             controlled_node_id,
             self.__tensors,
@@ -160,6 +162,8 @@ class BPQuantumEmulator(QuantumEmulator):
             None,
             self.__max_chi,
         )
+        self.__truncation_errors.append(err)
+        self.__entropies.append(entropy)
         self.__gates_num_passed_after_regauging += 1
 
     """Applies a one-qubit gate.
@@ -227,6 +231,14 @@ class BPQuantumEmulator(QuantumEmulator):
         self._set_to_vidal_canonical()
         self.__gates_num_passed_after_regauging = 0
         return result
+
+    @property
+    def truncation_errors(self) -> List[Array]:
+        return self.__truncation_errors
+
+    @property
+    def entropies(self) -> List[Array]:
+        return self.__entropies
 
     # --------------------------------------------------------------------------
 

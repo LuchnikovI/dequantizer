@@ -28,7 +28,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     apt update && apt install -y software-properties-common pip && \
     pip install --upgrade pip && \
     pip install -U setuptools && \
-    pip install numpy pytest -U mypy scipy pylint \
+    pip install numpy networkx pytest -U mypy scipy pylint \
         hydra-core matplotlib black \
         argparse h5py pyyaml ${jax_install} \
         .

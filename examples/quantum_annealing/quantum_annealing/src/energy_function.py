@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Union
 import jax.numpy as jnp
+import networkx as nx  # type: ignore
 from jax import Array
 from jax.random import split, normal
 
@@ -103,6 +104,7 @@ def random_on_ibm_heavy_hex(
     coupled_spin_pairs.append(jnp.array([111, 122]))
     coupled_spin_pairs.append(jnp.array([108, 112]))
     coupled_spin_pairs.append(jnp.array([112, 126]))
+    key, subkey = split(key)
     coupling_amplitudes = normal(subkey, (len(coupled_spin_pairs),)) * coupling_std
     return EnergyFunction(
         coupling_amplitudes,
@@ -165,6 +167,48 @@ def random_on_small_tree(
     coupled_spin_pairs.append(jnp.array([3, 8]))
     coupled_spin_pairs.append(jnp.array([3, 9]))
     coupling_amplitudes = normal(subkey, (len(coupled_spin_pairs),)) * coupling_std
+    return EnergyFunction(
+        coupling_amplitudes,
+        jnp.array(coupled_spin_pairs),
+        fields,
+    )
+
+
+def random_regular(
+    key: Array,
+    nodes_number: int = 150,
+    degree: int = 3,
+    field_std: Union[Array, float] = 1.0,
+    coupling_std: Union[Array, float] = 1.0,
+) -> EnergyFunction:
+    key, subkey = split(key)
+    graph = nx.random_regular_graph(degree, nodes_number, int(subkey[0]))
+    key, subkey = split(key)
+    fields = normal(subkey, (nodes_number,)) * field_std
+    coupled_spin_pairs = []
+    for edge in graph.edges:
+        coupled_spin_pairs.append(jnp.array(edge))
+    key, subkey = split(key)
+    coupling_amplitudes = normal(subkey, (len(coupled_spin_pairs),)) * coupling_std
+    return EnergyFunction(
+        coupling_amplitudes,
+        jnp.array(coupled_spin_pairs),
+        fields,
+    )
+
+
+def random_regular_maxcut(
+    key: Array,
+    nodes_number: int = 150,
+    degree: int = 3,
+) -> EnergyFunction:
+    key, subkey = split(key)
+    graph = nx.random_regular_graph(degree, nodes_number, int(subkey[0]))
+    fields = jnp.zeros((nodes_number,))
+    coupled_spin_pairs = []
+    for edge in graph.edges:
+        coupled_spin_pairs.append(jnp.array(edge))
+    coupling_amplitudes = -jnp.ones((len(coupled_spin_pairs),))
     return EnergyFunction(
         coupling_amplitudes,
         jnp.array(coupled_spin_pairs),

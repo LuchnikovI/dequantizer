@@ -285,7 +285,9 @@ class TensorGraph:
         accuracy: the maximal truncation error, not considered if None;
         max_rank: the maximal allowed edge dimension, not considered if None.
     Returns:
-        updated tensors and singular values.
+        updated tensors, singular values and resulting truncation error (
+            normalized sqrt of sum of squares of singular values),
+            entropy of lambdas sitting on the edge.
     """
 
     def apply2_to_vidal_canonical(
@@ -298,7 +300,7 @@ class TensorGraph:
         threshold: Union[Array, float],
         accuracy: Optional[Union[float, Array]],
         max_rank: Optional[int] = None,
-    ) -> Tuple[Dict[NodeID, Array], Dict[EdgeID, Array]]:
+    ) -> Tuple[Dict[NodeID, Array], Dict[EdgeID, Array], Array, Array]:
         if len(gate.shape) != 4:
             raise ValueError("Gate must be a tensor of rank 4.")
         if gate.shape[3] != gate.shape[1] or gate.shape[2] != gate.shape[0]:
@@ -347,7 +349,7 @@ class TensorGraph:
                 raise NotImplementedError(
                     "This branch is unreachable if the code is correct."
                 )
-        tensor1, tensor2, lmbd = simple_update(
+        tensor1, tensor2, lmbd, err, entropy = simple_update(
             tensor1,
             tensor2,
             lambdas1,
@@ -369,7 +371,7 @@ class TensorGraph:
         node1.bond_shape = tensor1.shape[:-1]
         node2.bond_shape = tensor2.shape[:-1]
         lambdas[edge_id] = lmbd
-        return tensors, lambdas
+        return tensors, lambdas, err, entropy
 
     """Applies a two-sides gate to a given subset of sides connected but the given edge.
     Args:
