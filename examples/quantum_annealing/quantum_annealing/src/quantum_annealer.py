@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Iterable, Tuple, Union, Dict, List
 from jax import Array
 import jax.numpy as jnp
-from dequantizer import TensorGraph, BPQuantumEmulator, Node
+from dequantizer import TensorGraph, BPQuantumEmulator
 from .energy_function import EnergyFunction
 
 log = logging.getLogger(__name__)

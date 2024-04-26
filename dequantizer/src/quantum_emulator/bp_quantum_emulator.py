@@ -91,8 +91,8 @@ class BPQuantumEmulator(QuantumEmulator):
         self.__lambdas: Optional[Dict[EdgeID, Array]] = None
         self.__vidal_distances_after_regauging: List[Array] = []
         self.__truncation_affected_vidal_distances: List[Array] = []
-        self.__truncation_errors = []
-        self.__entropies = []
+        self.__truncation_errors: List[Array] = []
+        self.__entropies: List[Array] = []
         self._set_to_vidal_canonical()
 
     @property

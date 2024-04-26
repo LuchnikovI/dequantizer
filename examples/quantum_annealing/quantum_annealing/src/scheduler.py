@@ -1,4 +1,4 @@
-from typing import Tuple, Union, Callable, Iterable, Generator
+from typing import Tuple, Union, Callable, Iterable
 from jax import Array
 
 """Returns a scheduler given its parameters."""

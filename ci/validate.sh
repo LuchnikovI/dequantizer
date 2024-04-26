@@ -7,7 +7,7 @@ script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
 
 log INFO "Running type checking..."
 
-python3 -m mypy "${script_dir}/../dequantizer"
+python3 -m mypy --exclude "${script_dir}/../examples" "${script_dir}/../dequantizer"
 
 if [[ $? -eq 0 ]]; then
     log INFO Type checking: OK

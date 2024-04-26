@@ -2,7 +2,7 @@ from typing import Union
 import jax.numpy as jnp
 from jax import Array
 from jax.random import PRNGKey, split, normal, randint
-from quantum_annealing.src.energy_function import EnergyFunction
+from .energy_function import EnergyFunction
 
 """A class for SimCim optimizer."""
 
