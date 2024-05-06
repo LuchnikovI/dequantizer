@@ -25,13 +25,19 @@ FROM ${base_image}
 WORKDIR /dequantizer
 COPY . .
 RUN export DEBIAN_FRONTEND=noninteractive && \
-    apt update && apt install -y software-properties-common pip && \
+    apt update && apt install -y software-properties-common pip git-all curl && \
     pip install --upgrade pip && \
     pip install -U setuptools && \
     pip install numpy networkx pytest -U mypy scipy pylint \
         hydra-core matplotlib black \
         argparse h5py pyyaml ${jax_install} \
-        .
+        . && \
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
+    export PATH="/root/.cargo/bin:\${PATH}" && \
+    git clone https://github.com/LuchnikovI/qem && \
+    (cd qem && pip install .) && \
+    rm -rf qem
+    
 
 EOF
 

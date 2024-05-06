@@ -8,7 +8,7 @@ from .energy_function import EnergyFunction
 
 log = logging.getLogger(__name__)
 
-flipped_hadamard = 0.5 * jnp.array(
+flipped_hadamard = jnp.sqrt(0.5) * jnp.array(
     [
         1,
         1,
@@ -23,6 +23,7 @@ flipped_hadamard = 0.5 * jnp.array(
 class QuantumAnnealingResults:
     configuration: Union[Array, None]
     density_matrices: Array
+    density_matrices_history: Union[List[Array], None]
     vidal_distances_after_regauging: Array
     truncation_affected_vidal_distances: Array
     truncation_errors: Array
@@ -96,6 +97,7 @@ def run_quantum_annealer(
     synchronous_update: bool,
     traversal_type: str,
     sample_measurements: bool,
+    record_history: bool,
 ) -> QuantumAnnealingResults:
     tensor_graph = _tensor_graph_init(energy_function)
     emulator = BPQuantumEmulator(
@@ -108,6 +110,7 @@ def run_quantum_annealer(
         synchronous_update,
         traversal_type,
     )
+    density_matrices_history = [] if record_history else None
     for node_id in range(tensor_graph.nodes_number):
         emulator.apply_q1(flipped_hadamard, node_id)
     for layer_num, (mixing_time, coupling_time) in enumerate(scheduler):
@@ -120,6 +123,11 @@ def run_quantum_annealer(
             emulator.apply_q2(coupling_gate, node_id1, node_id2)
         for node_id, mixing_gate in enumerate(mixing_gates):
             emulator.apply_q1(mixing_gate, node_id)
+        if record_history:
+            density_matrices = []
+            for node_id in range(tensor_graph.nodes_number):
+                density_matrices.append(emulator.dens_q1(node_id))
+            density_matrices_history.append(jnp.array(density_matrices))
     density_matrices = []
     for node_id in range(tensor_graph.nodes_number):
         density_matrices.append(emulator.dens_q1(node_id))
@@ -134,6 +142,7 @@ def run_quantum_annealer(
     return QuantumAnnealingResults(
         config,
         density_matrices,
+        density_matrices_history,
         emulator.after_regauging_vidal_distances,
         emulator.truncated_affected_vidal_distances,
         jnp.array(emulator.truncation_errors),

@@ -7,10 +7,17 @@ If image of the container does not exist, it builds it first. \
 It mounts the entire home directory inside the container to make the access to files on the machine \
 transparent.
 
-Usage: . ${BASH_SOURCE[0]} [OPTIONS] [HYDRA_OPTIONS]
+Usage: . ${BASH_SOURCE[0]} [COMMAND] [HYDRA_OPTIONS]
 
-Options:
-    --help: shows this message;
+Commands:
+    help: shows this message;
+    simcim: runs simcim experiment, one needs also to point out
+        a dirrectory with results of annealing as an argument, e.g.
+        ./runner.sh simcim +qbp_result_path=<path>;
+    qbp: runs BP based quantum annealing experiment;
+    exact: runs exact quantum annealing simmulation, one needs also to point out
+        a dirrectory with results of annealing as an argument, e.g.
+        ./runner.sh simcim +qbp_result_path=<path>.
 
 EOF
 }
@@ -35,11 +42,25 @@ docker_run="docker run \
 
 case $1 in
 
-  --help)
+  help)
         get_help
         exit 0
     ;;
+  simcim)
+        shift
+        ${docker_run} "${script_dir}/../simcim.py" $@
+    ;;
+  qbp)
+        shift
+        ${docker_run} "${script_dir}/../qbp.py" $@
+    ;;
+  exact)
+        shift
+        ${docker_run} "${script_dir}/../exact.py" $@
+    ;;
   *)
-        ${docker_run} "${script_dir}/../run_quantum_annealing.py" $@
+        log ERROR "Unknown command ${1}"
+        get_help
+        exit 1
     ;;
 esac

@@ -1,0 +1,5 @@
+total_time_step_size: 0.2
+schedule: "lambda t: 1 - t" #"lambda t: (jnp.arctanh(0.99) - jnp.arctanh(2 * 0.99 * t - 0.99)) / (2 * jnp.arctanh(0.99))"
+steps_number: 100
+sample_measurements: true
+record_history: true

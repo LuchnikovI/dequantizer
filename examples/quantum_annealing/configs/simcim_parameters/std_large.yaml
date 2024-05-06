@@ -1,0 +1,10 @@
+sigma: 2.
+attempt_num: 1000
+alpha: 0.9
+c_th: 1.0
+zeta: 1.0
+N: 50000
+dt: 0.9
+o: 0.5
+d: 0.
+s: 1.

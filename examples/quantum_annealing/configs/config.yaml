@@ -3,3 +3,6 @@ defaults:
   - task_generator: medium_random_regular
   - simcim_parameters: std
   - emulator_parameters: std
+hydra:
+  run:
+    dir: ./outputs/${hydra.job.name}/${now:%Y-%m-%d}/${now:%H-%M-%S}

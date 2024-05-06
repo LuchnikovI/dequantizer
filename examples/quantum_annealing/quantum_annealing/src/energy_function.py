@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Union
+from typing import Union, List
 import jax.numpy as jnp
 import networkx as nx  # type: ignore
 from jax import Array
@@ -20,6 +20,29 @@ class EnergyFunction:
     coupling_amplitudes: Array
     coupled_spin_pairs: Array
     fields: Array
+
+    """Returns number of nodes in a graph."""
+
+    @property
+    def nodes_number(self) -> int:
+        return self.fields.shape[0]
+
+    """Returns list with degrees of corresponding nodes."""
+
+    @property
+    def node_degrees(self) -> List[int]:
+        size = self.nodes_number
+        degrees = size * [0]
+        for i, j in self.coupled_spin_pairs:
+            degrees[int(i)] += 1
+            degrees[int(j)] += 1
+        return degrees
+
+    """Returns the number of edges in a graph."""
+
+    @property
+    def edges_number(self) -> int:
+        return self.coupled_spin_pairs.shape[0]
 
 
 """Generates an energy function corresponding to the classical

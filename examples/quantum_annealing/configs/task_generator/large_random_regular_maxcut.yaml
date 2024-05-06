@@ -1,5 +1,5 @@
 lattice_type: "random_regular_maxcut"
-fields_std: 1.
+fields_std: 0.
 couplings_std: 1.
 seed: 42
 nodes_number: 300
