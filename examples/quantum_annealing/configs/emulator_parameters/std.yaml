@@ -1,6 +1,6 @@
-max_chi: 8
+max_chi: 32
 max_belief_propagation_iterations: 100
 layers_per_regauging: 1
-accuracy: 1e-7
+accuracy: 1e-5
 synchronous_update: False
 traversal_type: "dfs"
