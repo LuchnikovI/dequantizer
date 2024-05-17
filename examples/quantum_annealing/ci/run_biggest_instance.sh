@@ -10,5 +10,6 @@
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
 
 . "${script_dir}/runner.sh" \
+    qbp \
     task_generator=very_large_random_regular \
     quantum_annealing_schedule=linear_wo_sampling_very_long

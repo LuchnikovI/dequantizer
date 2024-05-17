@@ -36,7 +36,9 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     export PATH="/root/.cargo/bin:\${PATH}" && \
     git clone https://github.com/LuchnikovI/qem && \
     (cd qem && pip install .) && \
-    rm -rf qem
+    rm -rf qem && \
+    git clone https://github.com/LuchnikovI/MQLib && \
+    (cd MQLib && make)
     
 
 EOF

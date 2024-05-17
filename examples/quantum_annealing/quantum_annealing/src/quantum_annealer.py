@@ -8,7 +8,7 @@ from .energy_function import EnergyFunction
 
 log = logging.getLogger(__name__)
 
-flipped_hadamard = jnp.sqrt(0.5) * jnp.array(
+hadamard = jnp.sqrt(0.5) * jnp.array(
     [
         1,
         1,
@@ -112,7 +112,7 @@ def run_quantum_annealer(
     )
     density_matrices_history = [] if record_history else None
     for node_id in range(tensor_graph.nodes_number):
-        emulator.apply_q1(flipped_hadamard, node_id)
+        emulator.apply_q1(hadamard, node_id)
     for layer_num, (mixing_time, coupling_time) in enumerate(scheduler):
         log.info(
             f"Running layer number {layer_num}, mixing_time: {mixing_time}, coupling_time: {coupling_time}"

@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from typing import Iterable, Tuple, Union, Dict, List
+from typing import Iterable, Tuple, Union, Dict, List, Callable, Optional
 from jax import Array
 from jax.random import split, uniform
 import jax.numpy as jnp
@@ -10,7 +10,7 @@ from .energy_function import EnergyFunction
 
 log = logging.getLogger(__name__)
 
-flipped_hadamard = np.sqrt(0.5) * np.array(
+hadamard = np.sqrt(0.5) * np.array(
     [
         1,
         1,
@@ -76,12 +76,13 @@ def run_exact_quantum_annealer(
     key: Array,
     sample_measurements: bool,
     record_history: bool,
+    state_callback: Optional[Callable[[QuantumState], None]] = None,
 ) -> ExactQuantumAnnealingResults:
     nodes_number = energy_function.nodes_number
     emulator = QuantumState(nodes_number)
     density_matrices_history = [] if record_history else None
     for node_id in range(nodes_number):
-        emulator.apply1(node_id, flipped_hadamard)
+        emulator.apply1(node_id, hadamard)
     for layer_num, (mixing_time, coupling_time) in enumerate(scheduler):
         log.info(
             f"Running layer number {layer_num}, mixing_time: {mixing_time}, coupling_time: {coupling_time}"
@@ -92,6 +93,8 @@ def run_exact_quantum_annealer(
             emulator.apply2(node_id1, node_id2, coupling_gate)
         for node_id, mixing_gate in enumerate(mixing_gates):
             emulator.apply1(node_id, mixing_gate)
+        if state_callback is not None:
+            state_callback(emulator)
         if record_history:
             density_matrices = []
             for node_id in range(nodes_number):

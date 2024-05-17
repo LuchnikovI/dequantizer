@@ -17,7 +17,10 @@ Commands:
     qbp: runs BP based quantum annealing experiment;
     exact: runs exact quantum annealing simmulation, one needs also to point out
         a dirrectory with results of annealing as an argument, e.g.
-        ./runner.sh simcim +qbp_result_path=<path>.
+        ./runner.sh simcim +qbp_result_path=<path>;
+    mqlib: runs MQLib solver, one needs also to point out
+        a dirrectory with results of annealing as an argument, e.g.
+        ./runner.sh simcim +qbp_result_path=<path>;
 
 EOF
 }
@@ -57,6 +60,10 @@ case $1 in
   exact)
         shift
         ${docker_run} "${script_dir}/../exact.py" $@
+    ;;
+  mqlib)
+        shift
+        ${docker_run} "${script_dir}/../mqlib.py" $@
     ;;
   *)
         log ERROR "Unknown command ${1}"

@@ -44,6 +44,24 @@ class EnergyFunction:
     def edges_number(self) -> int:
         return self.coupled_spin_pairs.shape[0]
 
+    """Transforms energy function to a file content of MQLib CLI."""
+
+    def to_mqlib_format(self) -> bytes:
+        nodes_number = self.nodes_number
+        records_number = self.coupled_spin_pairs.shape[0] + nodes_number
+        fields = self.fields.copy()
+        for pair, ampl in zip(self.coupled_spin_pairs, self.coupling_amplitudes):
+            fields[pair[0]] -= ampl
+            fields[pair[1]] -= ampl
+        format_string = ""
+        format_string += f"{nodes_number} {records_number}\n"
+        for i, field in enumerate(fields):
+            format_string += f"{i+1} {i+1} {2 * field}\n"
+        for pair, ampl in zip(self.coupled_spin_pairs, self.coupling_amplitudes):
+            pair = jnp.sort(pair)
+            format_string += f"{pair[0]+1} {pair[1]+1} {2 * ampl}\n"
+        return bytes(format_string, encoding="ascii")
+
 
 """Generates an energy function corresponding to the classical
 Ising model on the IBM Heavy Hex lattice consisting 127 spins with
