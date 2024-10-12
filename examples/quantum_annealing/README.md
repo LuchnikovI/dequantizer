@@ -29,11 +29,8 @@ To run custom numerical experiments use `./ci/runner.sh`. Execute `./ci/runner.s
 You can create new configs in `./configs` folder or modify existing one and execute corresponding experiments with `./ci/runner.sh` script.
 
 An example of how to run a custom small numerical experiment for debugging purposes:
-`.ci/runner.sh
-    qbp 
-    task_generator=debug_small_random_regular
-    quantum_annealing_schedule=linear_wo_sampling`
-    
+`./ci/runner.sh qbp task_generator=debug_small_random_regular quantum_annealing_schedule=linear_wo_sampling`
+
 where we override some of the subconfigs by predefined ones in `.configs` directory.
 
 ## Plotting
