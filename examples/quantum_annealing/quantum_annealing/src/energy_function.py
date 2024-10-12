@@ -51,8 +51,8 @@ class EnergyFunction:
         records_number = self.coupled_spin_pairs.shape[0] + nodes_number
         fields = self.fields.copy()
         for pair, ampl in zip(self.coupled_spin_pairs, self.coupling_amplitudes):
-            fields[pair[0]] -= ampl
-            fields[pair[1]] -= ampl
+            fields = fields.at[pair[0]].set(fields[pair[0]] - ampl)
+            fields = fields.at[pair[1]].set(fields[pair[1]] - ampl)
         format_string = ""
         format_string += f"{nodes_number} {records_number}\n"
         for i, field in enumerate(fields):
