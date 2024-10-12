@@ -2,25 +2,34 @@
 
 get_help() {
 cat << EOF
-Runs quantum annealing experiment within the container with all preinstalled dependancies. \
-If image of the container does not exist, it builds it first. \
+Runs quantum annealing experiment within a docker container with all preinstalled dependencies. \
+If image of the container does not exist, the script builds it first from scratch. \
 It mounts the entire home directory inside the container to make the access to files on the machine \
-transparent.
+transparent. Note, that this script uses Hydra (https://hydra.cc/docs/intro/) to control configuration
+of the experiment and you can override some of the options using Hydra syntax. E.g., to change quantum annealing \
+schedule and type of a task that is being solved in the BP based quantum annealing simulation one can run:
+
+./runner.sh qbp task_generator=debug_small_random_regular quantum_annealing_schedule=linear_wo_sampling
 
 Usage: . ${BASH_SOURCE[0]} [COMMAND] [HYDRA_OPTIONS]
 
 Commands:
+
     help: shows this message;
-    simcim: runs simcim experiment, one needs also to point out
-        a dirrectory with results of annealing as an argument, e.g.
-        ./runner.sh simcim +qbp_result_path=<path>;
+
     qbp: runs BP based quantum annealing experiment;
-    exact: runs exact quantum annealing simmulation, one needs also to point out
-        a dirrectory with results of annealing as an argument, e.g.
+
+    simcim: runs simcim experiment, one needs also to point to
+        a dirrectory with results of BP based quantum annealing simulation as an argument, e.g.
         ./runner.sh simcim +qbp_result_path=<path>;
-    mqlib: runs MQLib solver, one needs also to point out
-        a dirrectory with results of annealing as an argument, e.g.
-        ./runner.sh simcim +qbp_result_path=<path>;
+
+    exact: runs exact quantum annealing simmulation, one needs also to point to
+        a dirrectory with results of BP based quantum annealing simulation as an argument, e.g.
+        ./runner.sh exact +qbp_result_path=<path>;
+
+    mqlib: runs MQLib solver, one needs also to point to
+        a dirrectory with results of BP based quantum annealing simulation as an argument, e.g.
+        ./runner.sh mqlib +qbp_result_path=<path>;
 
 EOF
 }
