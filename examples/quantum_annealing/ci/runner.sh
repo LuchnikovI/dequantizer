@@ -11,7 +11,7 @@ schedule and type of a task that is being solved in the BP based quantum anneali
 
 ./runner.sh qbp task_generator=debug_small_random_regular quantum_annealing_schedule=linear_wo_sampling
 
-Usage: . ${BASH_SOURCE[0]} [COMMAND] [HYDRA_OPTIONS]
+Usage: . ${BASH_SOURCE[0]} [COMMAND] [HYDRA_OVERRIDING_OPTIONS]
 
 Commands:
 
