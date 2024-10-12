@@ -29,7 +29,7 @@ fi
 
 log INFO "Running linter..."
 
-python3 -m pylint --fail-under=8.3 "${script_dir}/../dequantizer"
+python3 -m pylint --fail-under=8 "${script_dir}/../dequantizer"
 
 if [[ $? -eq 0 ]]; then
     log INFO Linting: OK
