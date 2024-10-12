@@ -1,5 +1,5 @@
 total_time_step_size: 0.2
 schedule: 'lambda t: 1 - t'
-steps_number: 800
+steps_number: 1600
 sample_measurements: false
 record_history: true
