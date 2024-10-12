@@ -13,4 +13,4 @@ def eval_energy(energy_function: EnergyFunction, config: Array) -> float:
         energy_function.coupling_amplitudes,
         axes=1,
     )
-    return -external_field_energy - coupling_energy
+    return float(-external_field_energy - coupling_energy)

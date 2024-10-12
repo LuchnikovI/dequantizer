@@ -47,9 +47,9 @@ def main(cfg: DictConfig):
         pairs = np.array(f["coupled_spin_pairs"])
         coupling_amplitudes = np.array(f["coupling_amplitudes"])
         energy_function = EnergyFunction(
-            coupling_amplitudes,
-            pairs,
-            fields,
+            jnp.array(coupling_amplitudes),
+            jnp.array(pairs),
+            jnp.array(fields),
         )
     # running SimCim
     log.info(f"SimCim is started")

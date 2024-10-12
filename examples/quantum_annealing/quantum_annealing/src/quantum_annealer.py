@@ -1,3 +1,4 @@
+from typing import Optional
 import logging
 from dataclasses import dataclass
 from typing import Iterable, Tuple, Union, Dict, List
@@ -110,7 +111,7 @@ def run_quantum_annealer(
         synchronous_update,
         traversal_type,
     )
-    density_matrices_history = [] if record_history else None
+    density_matrices_history: Optional[List[Array]] = [] if record_history else None
     for node_id in range(tensor_graph.nodes_number):
         emulator.apply_q1(hadamard, node_id)
     for layer_num, (mixing_time, coupling_time) in enumerate(scheduler):
@@ -127,11 +128,12 @@ def run_quantum_annealer(
             density_matrices = []
             for node_id in range(tensor_graph.nodes_number):
                 density_matrices.append(emulator.dens_q1(node_id))
+            assert not (density_matrices_history is None)
             density_matrices_history.append(jnp.array(density_matrices))
     density_matrices = []
     for node_id in range(tensor_graph.nodes_number):
         density_matrices.append(emulator.dens_q1(node_id))
-    density_matrices = jnp.array(density_matrices)
+    density_matrices_arr = jnp.array(density_matrices)
     measurement_results = []
     if sample_measurements:
         for node_id in range(tensor_graph.nodes_number):
@@ -141,7 +143,7 @@ def run_quantum_annealer(
         config = None
     return QuantumAnnealingResults(
         config,
-        density_matrices,
+        density_matrices_arr,
         density_matrices_history,
         emulator.after_regauging_vidal_distances,
         emulator.truncated_affected_vidal_distances,

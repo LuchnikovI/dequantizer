@@ -5,6 +5,7 @@ from jax import Array
 from jax.random import split, uniform
 import jax.numpy as jnp
 import numpy as np
+from numpy.typing import NDArray
 from qem import QuantumState
 from .energy_function import EnergyFunction
 
@@ -31,7 +32,7 @@ class ExactQuantumAnnealingResults:
 def _init_q2_gates(
     energy_function: EnergyFunction,
     tau: Union[float, Array],
-) -> Dict[Tuple[int, int], Array]:
+) -> Dict[Tuple[int, int], NDArray]:
     gates = {}
     for pair, ampl in zip(
         energy_function.coupled_spin_pairs, energy_function.coupling_amplitudes
@@ -55,7 +56,7 @@ def _init_q2_gates(
 def _init_q1_gates(
     energy_function: EnergyFunction,
     tau: Union[float, Array],
-) -> List[Array]:
+) -> List[NDArray]:
     gate = jnp.array(
         [
             jnp.cos(tau),
@@ -80,7 +81,7 @@ def run_exact_quantum_annealer(
 ) -> ExactQuantumAnnealingResults:
     nodes_number = energy_function.nodes_number
     emulator = QuantumState(nodes_number)
-    density_matrices_history = [] if record_history else None
+    density_matrices_history: Optional[List[Array]] = [] if record_history else None
     for node_id in range(nodes_number):
         emulator.apply1(node_id, hadamard)
     for layer_num, (mixing_time, coupling_time) in enumerate(scheduler):
@@ -99,11 +100,12 @@ def run_exact_quantum_annealer(
             density_matrices = []
             for node_id in range(nodes_number):
                 density_matrices.append(emulator.dens1(node_id))
+            assert not (density_matrices_history is None)
             density_matrices_history.append(jnp.array(density_matrices))
     density_matrices = []
     for node_id in range(nodes_number):
         density_matrices.append(emulator.dens1(node_id))
-    density_matrices = jnp.array(density_matrices)
+    density_matrices_arr = jnp.array(density_matrices)
     measurement_results = []
     if sample_measurements:
         for node_id in range(nodes_number):
@@ -115,6 +117,6 @@ def run_exact_quantum_annealer(
         config = None
     return ExactQuantumAnnealingResults(
         config,
-        density_matrices,
+        density_matrices_arr,
         density_matrices_history,
     )

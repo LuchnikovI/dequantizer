@@ -24,15 +24,21 @@ def generate_lattice(
 
         case "ibm_heavy_hex":
             key, subkey = split(key)
+            assert not (field_std is None)
+            assert not (coupling_std is None)
             energy_function = random_on_ibm_heavy_hex(subkey, field_std, coupling_std)
 
         case "one_heavy_hex_loop":
             key, subkey = split(key)
+            assert not (field_std is None)
+            assert not (coupling_std is None)
             energy_function = random_on_one_heavy_hex_loop(
                 subkey, field_std, coupling_std
             )
 
         case "small_tree":
+            assert not (field_std is None)
+            assert not (coupling_std is None)
             key, subkey = split(key)
             energy_function = random_on_small_tree(subkey, field_std, coupling_std)
 
@@ -40,6 +46,8 @@ def generate_lattice(
             key, subkey = split(key)
             assert degree is not None
             assert nodes_number is not None
+            assert not (field_std is None)
+            assert not (coupling_std is None)
             energy_function = random_regular(
                 subkey, nodes_number, degree, field_std, coupling_std
             )

@@ -167,6 +167,7 @@ class TensorGraph:
                 visited_ids.add(element.id)
                 for new_element in element.neighbors:
                     stack.append(new_element)
+        return None
 
     """Returns a dict with initialized node tensors that is used later in pure functions
     performing different algorithms, e.g. belief propagation.

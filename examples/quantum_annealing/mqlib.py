@@ -37,9 +37,9 @@ def main(cfg: DictConfig):
         pairs = np.array(f["coupled_spin_pairs"])
         coupling_amplitudes = np.array(f["coupling_amplitudes"])
         energy_function = EnergyFunction(
-            coupling_amplitudes,
-            pairs,
-            fields,
+            jnp.array(coupling_amplitudes),
+            jnp.array(pairs),
+            jnp.array(fields),
         )
     hdf5_file = h5py.File(f"{qbp_result_path}/mqlib_result", "a")
     hdf5_file.create_dataset(

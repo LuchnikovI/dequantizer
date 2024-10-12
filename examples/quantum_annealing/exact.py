@@ -58,9 +58,9 @@ def main(cfg: DictConfig):
         pairs = np.array(f["coupled_spin_pairs"])
         coupling_amplitudes = np.array(f["coupling_amplitudes"])
         energy_function = EnergyFunction(
-            coupling_amplitudes,
-            pairs,
-            fields,
+            jnp.array(coupling_amplitudes),
+            jnp.array(pairs),
+            jnp.array(fields),
         )
     qubits_number = energy_function.nodes_number
     # running quantum annealing

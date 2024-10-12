@@ -56,7 +56,7 @@ class MQLib:
             )
             if len(result.stderr) != 0:
                 # TODO: proper exception here
-                raise ValueError(f"MQLib return non-empty stderr: {result.stderr}")
+                raise ValueError(f"MQLib return non-empty stderr: {result.stderr!r}")
             lines = result.stdout.split(sep=b"\n")
             energy = (
                 jnp.array(float(lines[0].split(sep=b",")[3]))
